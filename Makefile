@@ -89,7 +89,9 @@ INC_FOLDERS=\
 						src/ext/cpputil/ \
 						src/ext/x64asm \
 						src/ext/gtest-1.7.0/include \
-						src/ext/z3/src/api
+						src/ext/z3/src/api \
+                                                ../..//Install/postgresql-11.4.install/include \
+                                                ../../Install/libpqxx-4.0.install/include
 ifndef NOCVC4
 INC_FOLDERS += $(CVC4_OUTDIR)/include
 endif
@@ -106,7 +108,7 @@ LIB=\
 	-lcln \
 	-liml -lgmp \
 	-L src/ext/z3/build -lz3 \
-	-lpqxx -lpq
+	-L/home/sdasgup3/Install/libpqxx-4.0.install/lib/ -L/home/sdasgup3/Install/postgresql-11.4.install/lib/ -lpqxx -lpq
 ifndef NOCVC4
 LIB += -L $(CVC4_OUTDIR)/lib -lcvc4
 endif
