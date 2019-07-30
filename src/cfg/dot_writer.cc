@@ -153,4 +153,42 @@ void DotWriter::write_reaching_def(ostream& os, const Dfv_RD& rs) const {
   }
 }
 
+void DotWriter::plot_dfg(ostream& os, const Cfg& cfg) const {
+  // Add nodes
+  for (auto i = ++cfg.reachable_begin(), ie = cfg.reachable_end(); i != ie; ++i) {
+    for (size_t j = 0, je = cfg.num_instrs(*i); j < je; ++j) {
+      const auto idx = cfg.get_index({*i, j});
+
+      os << "I" << dec << idx << " [";
+      os << "shape=record  ";
+      os << "label=\"{#" << idx << ":" << cfg.get_code()[idx];
+      os << "}\"];" << endl;
+    }
+  }
+
+  // Add edges
+  for (auto i = ++cfg.reachable_begin(), ie = cfg.reachable_end(); i != ie; ++i) {
+    for (size_t j = 0, je = cfg.num_instrs(*i); j < je; ++j) {
+      const auto idx = cfg.get_index({*i, j});
+      auto rd_ins = cfg.reaching_defs_in({*i, j});
+
+      for (size_t k = 0 ; k < rd_ins.size(); k++) {
+        if (rd_ins[k] == RegSet::empty()) {
+          continue;
+        }
+        os << "I" << dec << k << "->I" << dec << idx << " [";
+        os << "style=bold";
+        os << " color=";
+        os << "black";
+
+        stringstream ss;
+        ss << rd_ins[k];
+        string s = ss.str();
+        os << " label=\"" << "\\" << s.substr(0, s.size() - 1) << "\\}\"";
+        os << "];" << endl;
+
+      }
+    }
+  }
+}
 } // namespace stoke

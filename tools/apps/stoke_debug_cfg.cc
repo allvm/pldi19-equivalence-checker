@@ -44,6 +44,9 @@ auto& lob = FlagArg::create("lob")
 auto& rd = FlagArg::create("rd")
            .alternate("reaching_defs_in")
            .description("Display reaching defintions in values for instructions");
+auto& dfg = FlagArg::create("dfg")
+            .alternate("data_flow_graph")
+            .description("Display data flow graph");
 
 auto& io = Heading::create("I/O Options:");
 auto& out = ValueArg<string>::create("o")
@@ -82,7 +85,8 @@ void to_dot(const string& dot_file) {
   DotWriter dw;
   dw.set_def_in(dib, dii)
   .set_live_out(lob)
-  .set_reaching_defs_in(rd);
+  .set_reaching_defs_in(rd)
+  .set_dfg(dfg);
 
   dw(ofs, *target);
 }

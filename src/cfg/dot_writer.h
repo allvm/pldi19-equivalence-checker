@@ -50,17 +50,28 @@ public:
     return *this;
   }
 
+  /** Toggle whether to display the reaching-defs-in relation for instructions. */
+  DotWriter& set_dfg(bool flag) {
+    dfg_ = flag;
+    return *this;
+  }
+
+
 
   /** Emits a control flow graph in .dot format. */
   void operator()(std::ostream& os, const Cfg& cfg) const {
     os << "digraph g {" << std::endl;
     os << "colorscheme = blues6" << std::endl;
 
-    write_entry(os, cfg);
-    write_exit(os, cfg);
-    write_blocks(os, cfg);
-    write_edges(os, cfg);
+    if (dfg_) {
+      plot_dfg(os, cfg);
+    } else {
+      write_entry(os, cfg);
+      write_exit(os, cfg);
+      write_blocks(os, cfg);
+      write_edges(os, cfg);
 
+    }
     os << "}";
   }
 
@@ -77,8 +88,8 @@ private:
   void write_edges(std::ostream& os, const Cfg& cfg) const;
   /** Write the contents of a register set. */
   void write_reg_set(std::ostream& os, const x64asm::RegSet& rs) const;
-  /** Write the contents of a register set. */
   void write_reaching_def(std::ostream& os, const Dfv_RD& rs) const;
+  void plot_dfg(std::ostream& os, const Cfg& cfg) const;
 
   /** Write the defined-in relation for blocks? */
   bool def_in_block_;
@@ -88,6 +99,8 @@ private:
   bool live_out_block_;
   /** Write the reaching defs-in relation for instructions */
   bool reaching_defs_in_instr_;
+  /** Write the data flow graph */
+  bool dfg_;
 };
 
 } // namespace stoke
