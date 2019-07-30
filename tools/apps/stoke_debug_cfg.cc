@@ -41,6 +41,9 @@ auto& dii = FlagArg::create("dii")
 auto& lob = FlagArg::create("lob")
             .alternate("live_out_block")
             .description("Display live out values for basic blocks");
+auto& rd = FlagArg::create("rd")
+           .alternate("reaching_defs_in")
+           .description("Display reaching defintions in values for instructions");
 
 auto& io = Heading::create("I/O Options:");
 auto& out = ValueArg<string>::create("o")
@@ -78,7 +81,8 @@ void to_dot(const string& dot_file) {
 
   DotWriter dw;
   dw.set_def_in(dib, dii)
-  .set_live_out(lob);
+  .set_live_out(lob)
+  .set_reaching_defs_in(rd);
 
   dw(ofs, *target);
 }

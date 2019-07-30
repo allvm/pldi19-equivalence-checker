@@ -29,6 +29,11 @@ void DotWriter::write_entry(ostream& os, const Cfg& cfg) const {
     os << "|def-in: ";
     write_reg_set(os, cfg.def_ins());
   }
+  if (reaching_defs_in_instr_) {
+    os << "|reaching-def-in: ";
+    write_reaching_def(os, cfg.reaching_defs_in());
+  }
+
   os << "}\"];" << endl;
 }
 
@@ -60,10 +65,20 @@ void DotWriter::write_block(ostream& os, const Cfg& cfg, Cfg::id_type id) const 
     os << "|def-in: ";
     write_reg_set(os, cfg.def_ins(id));
   }
+  if (reaching_defs_in_instr_ && cfg.is_reachable(id)) {
+    os << "|reaching-def-in: ";
+    write_reaching_def(os, cfg.reaching_defs_in(id));
+  }
+
   for (size_t j = 0, je = cfg.num_instrs(id); j < je; ++j) {
     if (def_in_instr_ && cfg.is_reachable(id)) {
       os << "|def-in: ";
       write_reg_set(os, cfg.def_ins({id, j}));
+    }
+
+    if (reaching_defs_in_instr_ && cfg.is_reachable(id)) {
+      os << "|reaching-def-in: ";
+      write_reaching_def(os, cfg.reaching_defs_in({id, j}));
     }
 
     auto instr = cfg.get_instr({id, j});
@@ -122,6 +137,19 @@ void DotWriter::write_reg_set(ostream& os, const RegSet& rs) const {
   ss << rs;
   string s = ss.str();
   os << "\\" << s.substr(0, s.size() - 1) << "\\}";
+}
+
+void DotWriter::write_reaching_def(ostream& os, const Dfv_RD& rs) const {
+  stringstream ss;
+
+  for (size_t i = 0 ; i < rs.size(); i++) {
+    if (rs[i] == RegSet::empty()) {
+      continue;
+    }
+    ss << rs[i];
+    string s = ss.str();
+    os << i << ": " << "\\" << s.substr(0, s.size() - 1) << "\\}\\n";
+  }
 }
 
 } // namespace stoke

@@ -23,6 +23,7 @@ using namespace x64asm;
 //#define STOKE_CFG_ALL_INSTR_BLOCK
 //#define STOKE_CFG_AFTER_LABEL_NEW_BLOACK
 //#define STOKE_CFG_COMPARE_NEW_BLOCK
+#define DEBUG_CFG_RD
 
 namespace stoke {
 
@@ -221,6 +222,26 @@ void Cfg::recompute_preds() {
   }
 }
 
+void Cfg::recompute_preds_instrs() {
+  preds_instrs_.resize(get_code().size()+1);
+  for (auto& p : preds_instrs_) {
+    p.clear();
+  }
+
+  for (auto i = get_entry(), ie = get_exit(); i < ie; ++i) {
+    for (size_t j = 1, je = num_instrs(i); j < je; ++j) {
+      if (j != 0) {
+        const auto idx = get_index({i, j});
+        preds_instrs_[idx].push_back({i, idx-1});
+      } else {
+        for (auto p = pred_begin(i), pe = pred_end(i); p != pe; ++p) {
+          preds_instrs_[get_index({i, 0})].push_back({*p, je-1});
+        }
+      }
+    }
+  }
+}
+
 void Cfg::recompute_reachable() {
   reachable_.resize_for_bits(num_blocks());
   reachable_.reset();
@@ -236,6 +257,129 @@ void Cfg::recompute_reachable() {
       if (!reachable_[*s]) {
         reachable_[*s] = true;
         work_list_.push_back(*s);
+      }
+    }
+  }
+}
+
+/*
+  The data flow information for each instruction is a vector of size get_code().size() + 1.
+  Each element of that vector hols a set of registers.
+
+  The gen set of an instruction i is reaching_defs_in_gen_i][i]
+
+  The kill set of an instruction i is reaching_defs_in_gen_i][j], where j is all the istructions which are killed
+  and the content of reaching_defs_in_gen_i][j] is the regs if j which are killed by i
+*/
+void Cfg::recompute_reaching_defs_in_gen_kill() {
+  reaching_defs_in_gen_.resize(get_code().size() + 1, Dfv_RD(get_code().size(), RegSet::empty()));
+  reaching_defs_in_kill_.resize(get_code().size() + 1, Dfv_RD(get_code().size(), RegSet::empty()));
+  x64asm::RegSet gen, kill, aux_kill;
+
+  // Find the gen set for all instructions
+  for (auto i = ++reachable_begin(), ie = reachable_end(); i != ie; ++i) {
+    for (size_t j = 0, je = num_instrs(*i); j < je; ++j) {
+      const auto idx = get_index({*i, j});
+      gen = RegSet::empty();
+      gen |= must_write_set(get_code()[idx]);
+      gen -= maybe_undef_set(get_code()[idx]);
+      reaching_defs_in_gen_[idx][idx] = gen;
+    }
+  }
+
+  // Find the kill set for all instructions
+  for (auto i = ++reachable_begin(), ie = reachable_end(); i != ie; ++i) {
+    for (size_t j = 0, je = num_instrs(*i); j < je; ++j) {
+      const auto idx = get_index({*i, j});
+
+      kill = RegSet::empty();
+      kill |= must_write_set(get_code()[idx]);
+      kill -= maybe_undef_set(get_code()[idx]);
+      //cout << "Finding Kill set for " << get_code()[idx] << "\n";
+      //cout << "\tKill Set " << kill << "\n";
+
+      for (size_t k = 0 ; k < get_code().size(); k++) {
+        if (k == idx) continue;
+
+        gen = reaching_defs_in_gen_[k][k];
+        auto aux_kill = gen & kill;
+        //cout << "Queying gen set for " << get_code()[k] << "\n";
+        //cout << "\tGen Set " << gen << "\n";
+        //cout << "\tInsersection " << aux_kill << "\n";
+        //if(aux_kill != RegSet::empty()) {
+        //  cout << "Found: " << aux_kill << "\n";
+        //}
+        reaching_defs_in_kill_[idx][k] = aux_kill;
+      }
+    }
+  }
+
+#ifdef DEBUG_CFG_RD
+  for (size_t k = 0 ; k < get_code().size(); k++) {
+    std::cout << get_code()[k] << "\n";
+    auto gen_rs = reaching_defs_in_gen_[k];
+    auto kill_rs = reaching_defs_in_kill_[k];
+
+    std::cout << "\tgen-set: \n";
+    for (size_t i = 0 ; i < gen_rs.size(); i++) {
+      if (gen_rs[i] != RegSet::empty()) {
+        std::cout << "\t\t[\n";
+        std::cout << "\t\t\t" << get_code()[i] << "\n";
+        std::cout << "\t\t\t\t" << gen_rs[i] << "\n";
+        std::cout << "\t\t]\n\n";
+      }
+    }
+
+    std::cout << "\tkill-set: \n";
+    for (size_t i = 0 ; i < kill_rs.size(); i++) {
+      if (kill_rs[i] != RegSet::empty()) {
+        std::cout << "\t\t[\n";
+        std::cout << "\t\t\t" << get_code()[i] << "\n";
+        std::cout << "\t\t\t\t" << kill_rs[i] << "\n";
+        std::cout << "\t\t]\n\n";
+      }
+    }
+  }
+#endif
+}
+
+void Cfg::recompute_reaching_defs_in() {
+  recompute_reaching_defs_in_gen_kill();
+
+  reaching_defs_in_.resize(get_code().size() + 1, Dfv_RD(get_code().size(), RegSet::empty()));
+  reaching_defs_out_.resize(get_code().size() + 1,Dfv_RD(get_code().size(), RegSet::empty()));
+
+  // Boundary conditions
+  //def_outs_[get_entry()] = fxn_def_ins_;
+  reaching_defs_out_[get_entry()] = fxn_reaching_defs_ins_;
+
+  // Initial conditions
+  for (auto i = ++reachable_begin(), ie = reachable_end(); i != ie; ++i) {
+    reaching_defs_out_[*i] = fxn_reaching_defs_ins_;
+  }
+
+  // Iterate until fixed point
+  for (auto changed = true; changed;) {
+    changed = false;
+
+    for (auto i = ++reachable_begin(), ie = reachable_end(); i != ie; ++i) {
+      for (size_t j = 0, je = num_instrs(*i); j < je; ++j) {
+        const auto idx = get_index({*i, j});
+
+        if (j == 0) { // Do Meet of the predecessors
+          for (auto p = pred_begin_instr({*i, j}), pe = pred_end_instr({*i, j}); p != pe; ++p) {
+            reaching_defs_in_[idx] |= reaching_defs_out_[get_index(*p)];
+          }
+        } else {
+          reaching_defs_in_[idx] = reaching_defs_out_[idx-1];
+        }
+
+        // Transfer function
+        const auto new_out = (reaching_defs_in_[idx] - reaching_defs_in_kill_[idx]) | reaching_defs_in_gen_[idx];
+
+        // Check for fixed point
+        changed |= reaching_defs_out_[idx] != new_out;
+        reaching_defs_out_[idx] = new_out;
       }
     }
   }

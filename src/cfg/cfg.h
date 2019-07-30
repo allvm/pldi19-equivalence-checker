@@ -1,4 +1,4 @@
-// Copyright 2013-2019 Stanford University
+// Copyrhs 2013-2019 Stanford University
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,6 +32,113 @@
 
 namespace stoke {
 
+class Dfv_RD {
+private:
+  std::vector<x64asm::RegSet> DFV;
+public:
+  Dfv_RD(size_t n, x64asm::RegSet rs = x64asm::RegSet::empty()) {
+    DFV.resize(n, rs);
+  }
+  size_t size() const {
+    return DFV.size();
+  }
+  const x64asm::RegSet& operator[](size_t index) const {
+    assert(index < DFV.size() && "Array OOB!!");
+    return DFV[index];
+  }
+
+  x64asm::RegSet& operator[](size_t index)  {
+    assert(index < DFV.size() && "Array OOB!!");
+    return DFV[index];
+  }
+
+  /** Set union. */
+  Dfv_RD operator|(const Dfv_RD &rhs) const {
+    size_t n = size();
+    assert(n == rhs.size() && "Size mismatch on operator |\n");
+    auto retval = Dfv_RD(n);
+    for (size_t i = 0 ; i < n; i++) {
+      retval[i] = DFV[i] | rhs[i];
+    }
+
+    return retval;
+  }
+
+  /** Set union. */
+  Dfv_RD operator|=(const Dfv_RD &rhs)  {
+    size_t n = size();
+    assert(n == rhs.size() && "Size mismatch on operator |\n");
+
+    for (size_t i = 0 ; i < n; i++) {
+      DFV[i] |=  rhs[i];
+    }
+
+    return *this;
+  }
+
+  /** Set intersection. */
+  Dfv_RD operator&(const Dfv_RD &rhs) const {
+    size_t n = size();
+    assert(n == rhs.size() && "Size mismatch on operator |\n");
+    auto retval = Dfv_RD(n);
+    for (size_t i = 0 ; i < n; i++) {
+      retval[i] = DFV[i] & rhs[i];
+    }
+
+    return retval;
+  }
+
+  /** Set intersection. */
+  Dfv_RD operator&=(const Dfv_RD &rhs)  {
+    size_t n = size();
+    assert(n == rhs.size() && "Size mismatch on operator |\n");
+
+    for (size_t i = 0 ; i < n; i++) {
+      DFV[i] &=  rhs[i];
+    }
+
+    return *this;
+  }
+
+  /** Set inversion. */
+  Dfv_RD operator~()  const {
+    size_t n = size();
+    auto retval = Dfv_RD(n);
+    for (size_t i = 0 ; i < n; i++) {
+      retval[i] = ~DFV[i];
+    }
+
+    return retval;
+  }
+
+  /** Set difference. */
+  Dfv_RD operator-(const Dfv_RD &rhs) const {
+    return (*this) & ~rhs;
+  }
+
+  /** Set equality. */
+  bool operator==(const Dfv_RD& rhs) const {
+    size_t n = size();
+    assert(n == rhs.size() && "Size mismatch on operator |\n");
+    for (size_t i = 0 ; i < n; i++) {
+      if (DFV[i] != rhs[i]) return false;
+    }
+
+    return true;
+  }
+
+  /** Set inequality. */
+  bool operator!=(const Dfv_RD& rhs) const {
+    return !(*this == rhs);
+  }
+
+  /** Set containment. */
+  bool contains(const Dfv_RD& rhs) const {
+    return (*this & rhs) == rhs;
+  }
+
+};
+
 class Cfg {
 public:
   /** Basic block id type. */
@@ -45,6 +152,10 @@ public:
   typedef x64asm::Code::const_iterator instr_iterator;
   /** Iterator over a basic block's successors. */
   typedef std::vector<id_type>::const_iterator pred_iterator;
+
+  /** Iterator over an instructions's predecessors. */
+  typedef std::vector<loc_type>::const_iterator pred_instr_iterator;
+
   /** Iterator over a basic block's predecssors. */
   typedef std::vector<id_type>::const_iterator succ_iterator;
   /** Iterator over reachable blocks. */
@@ -67,7 +178,8 @@ public:
   explicit Cfg(const TUnit& function,
                const x64asm::RegSet& def_ins = x64asm::RegSet::empty(),
                const x64asm::RegSet& live_outs = x64asm::RegSet::empty()) :
-    function_(function), fxn_def_ins_(def_ins), fxn_live_outs_(live_outs) {
+    function_(function), fxn_def_ins_(def_ins), fxn_live_outs_(live_outs),
+    fxn_reaching_defs_ins_(get_code().size(), x64asm::RegSet::empty()) {
     recompute();
   }
 
@@ -75,6 +187,7 @@ public:
   void recompute() {
     recompute_structure();
     recompute_defs();
+    recompute_reaching_defs_in();
     recompute_liveness();
   }
   /** Recompute graph structure; modifying control flow will invalidate this state, calling this
@@ -84,12 +197,18 @@ public:
     recompute_labels();
     recompute_succs();
     recompute_preds();
+    recompute_preds_instrs();
     recompute_reachable();
   }
   /** Recomputes the defined-in relation for instructions; modifying an instruction will invalidate
     this relation, calling this method will restore it. Undefined if graph structure is not up to
     date. */
   void recompute_defs();
+
+  /** Recomputes the reaching defs-in relation for instructions; modifying an instruction will invalidate
+    this relation, calling this method will restore it. Undefined if graph structure is not up to
+    date. */
+  void recompute_reaching_defs_in();
 
   /** Return a reference to the function underlying this graph. */
   TUnit& get_function() {
@@ -165,6 +284,20 @@ public:
     return get_code().begin() + blocks_[id + 1];
   }
 
+  pred_instr_iterator pred_begin_instr(loc_type id) const {
+    assert(id.first < num_blocks());
+    auto idx = get_index(id);
+    assert(idx < get_code().size());
+    return preds_instrs_[idx].begin();
+  }
+  /** Returns an iterator that points to the end of this block's predecessor list. */
+  pred_instr_iterator pred_end_instr(loc_type id) const {
+    assert(id.first < num_blocks());
+    auto idx = get_index(id);
+    assert(idx < get_code().size());
+    return preds_instrs_[idx].end();
+  }
+
   /** Returns an iterator that points to the beginning of this block's predecessor list. */
   pred_iterator pred_begin(id_type id) const {
     assert(id < num_blocks());
@@ -235,6 +368,29 @@ public:
   bool is_reachable(id_type id) const {
     assert(id < num_blocks());
     return reachable_[id];
+  }
+
+  /** Returns the set of instrucions along with the register
+    that are defined on entry to to this graph. */
+  Dfv_RD reaching_defs_in() const {
+    return fxn_reaching_defs_ins_;
+  }
+
+  /** Returns the set of registers that are defined on entry to a basic block; undefined for unreachable
+    blocks. */
+  Dfv_RD reaching_defs_in(id_type id) const {
+    assert(is_reachable(id));
+    return reaching_defs_in_[get_index({id, 0})];
+    //return reaching_defs_in_kill_[get_index({id, 0})];
+  }
+
+  /** Returns the set of instrucions along with the register
+    that are defined on entry to an instruction; undefined for unreachable
+    blocks. */
+  Dfv_RD reaching_defs_in(const loc_type& loc) const {
+    assert(is_reachable(loc.first));
+    return reaching_defs_in_[get_index(loc)];
+    //return reaching_defs_in_kill_[get_index(loc)];
   }
 
   /** Returns the set of registers that are defined on entry to this graph. */
@@ -436,6 +592,8 @@ private:
   x64asm::RegSet fxn_def_ins_;
   /** User-specified registers that are defined on exit from this graph. */
   x64asm::RegSet fxn_live_outs_;
+  /** User-specified reaching-defs-in that are defined on entry to this graph. */
+  Dfv_RD fxn_reaching_defs_ins_;
 
   // This temporary state is maintained to reduce the overhead of repeated allocations
 
@@ -452,6 +610,7 @@ private:
   std::vector<size_t> blocks_;
   /** Basic block predecessor lists. */
   std::vector<std::vector<id_type>> preds_;
+  std::vector<std::vector<loc_type>> preds_instrs_;
   /** Basic block successor lists. */
   std::vector<std::vector<id_type>> succs_;
   /** The set of reachable basic blocks. */
@@ -459,6 +618,10 @@ private:
   /** Scratch space for computing reachability. */
   std::vector<id_type> work_list_;
 
+  /** The set of reaching definitions to every instruction.
+    The final element refers to the exit block. */
+  std::vector<Dfv_RD> reaching_defs_in_;
+  std::vector<Dfv_RD> reaching_defs_out_;
   /** The set of registers defined in for every instruction. The final element refers to the exit block. */
   std::vector<x64asm::RegSet> def_ins_;
   /** The set of registers defined out of every block. */
@@ -467,8 +630,12 @@ private:
   std::vector<x64asm::RegSet> gen_;
   /** The kill set for each block. */
   std::vector<x64asm::RegSet> kill_;
+  /** The gen set for each instruction. */
+  std::vector<Dfv_RD> reaching_defs_in_gen_;
+  /** The kill set for each instruction. */
+  std::vector<Dfv_RD> reaching_defs_in_kill_;
 
-  /** The set of registers live out for every instruction. The final element refers to the exit block. */
+  /** The set of registers live out for every instruction. The final element refers to the eit block. */
   std::vector<x64asm::RegSet> live_outs_;
   /** The set of registers live in at each instruction */
   std::vector<x64asm::RegSet> live_ins_;
@@ -486,11 +653,16 @@ private:
   void recompute_succs();
   /** Recompute the contents of preds_; assumes blocks_ and succs_ are up to date. */
   void recompute_preds();
+  void recompute_preds_instrs();
   /** Recompute the contents of reachable_; assumes blocks_ and succs_ are up to date. */
   void recompute_reachable();
 
   /** Recomputes the gen and kill sets used by recompute_defs(). */
   void recompute_defs_gen_kill();
+
+  /** Recomputes the gen and kill sets used by recompute_reaching_defs(). */
+  void recompute_reaching_defs_in_gen_kill();
+
   /** Recomputes the use and defs set used for liveness */
   void recompute_liveness_use_kill();
   /** Recomputes live_outs_ using the generic LFP dataflow algorithm */

@@ -29,6 +29,7 @@ public:
   DotWriter() {
     set_def_in(false, false);
     set_live_out(false);
+    set_reaching_defs_in(false);
   }
 
   /** Toggle whether to display the defined-in relation for blocks and instructions. */
@@ -42,6 +43,13 @@ public:
     live_out_block_ = block;
     return *this;
   }
+
+  /** Toggle whether to display the reaching-defs-in relation for instructions. */
+  DotWriter& set_reaching_defs_in(bool flag) {
+    reaching_defs_in_instr_ = flag;
+    return *this;
+  }
+
 
   /** Emits a control flow graph in .dot format. */
   void operator()(std::ostream& os, const Cfg& cfg) const {
@@ -69,6 +77,8 @@ private:
   void write_edges(std::ostream& os, const Cfg& cfg) const;
   /** Write the contents of a register set. */
   void write_reg_set(std::ostream& os, const x64asm::RegSet& rs) const;
+  /** Write the contents of a register set. */
+  void write_reaching_def(std::ostream& os, const Dfv_RD& rs) const;
 
   /** Write the defined-in relation for blocks? */
   bool def_in_block_;
@@ -76,6 +86,8 @@ private:
   bool def_in_instr_;
   /** Write the live-out relation for blocks? */
   bool live_out_block_;
+  /** Write the reaching defs-in relation for instructions */
+  bool reaching_defs_in_instr_;
 };
 
 } // namespace stoke
