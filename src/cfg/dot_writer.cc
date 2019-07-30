@@ -30,7 +30,7 @@ void DotWriter::write_entry(ostream& os, const Cfg& cfg) const {
     write_reg_set(os, cfg.def_ins());
   }
   if (reaching_defs_in_instr_) {
-    os << "|reaching-def-in: ";
+    os << "|reaching-def-in: \\n";
     write_reaching_def(os, cfg.reaching_defs_in());
   }
 
@@ -66,7 +66,7 @@ void DotWriter::write_block(ostream& os, const Cfg& cfg, Cfg::id_type id) const 
     write_reg_set(os, cfg.def_ins(id));
   }
   if (reaching_defs_in_instr_ && cfg.is_reachable(id)) {
-    os << "|reaching-def-in: ";
+    os << "|reaching-def-in: \\n";
     write_reaching_def(os, cfg.reaching_defs_in(id));
   }
 
@@ -77,14 +77,14 @@ void DotWriter::write_block(ostream& os, const Cfg& cfg, Cfg::id_type id) const 
     }
 
     if (reaching_defs_in_instr_ && cfg.is_reachable(id)) {
-      os << "|reaching-def-in: ";
+      os << "|reaching-def-in: \\n";
       write_reaching_def(os, cfg.reaching_defs_in({id, j}));
     }
 
     auto instr = cfg.get_instr({id, j});
     if (!instr.is_nop()) {
       os << "|";
-      os << instr;
+      os << "#" << j << " "<<  instr;
       os << "\\l";
     }
   }
@@ -140,12 +140,13 @@ void DotWriter::write_reg_set(ostream& os, const RegSet& rs) const {
 }
 
 void DotWriter::write_reaching_def(ostream& os, const Dfv_RD& rs) const {
-  stringstream ss;
+  //stringstream ss;
 
   for (size_t i = 0 ; i < rs.size(); i++) {
     if (rs[i] == RegSet::empty()) {
       continue;
     }
+    stringstream ss;
     ss << rs[i];
     string s = ss.str();
     os << i << ": " << "\\" << s.substr(0, s.size() - 1) << "\\}\\n";

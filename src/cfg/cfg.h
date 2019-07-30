@@ -237,7 +237,10 @@ public:
   /** Returns the index in the underlying code that a location corresponds to. */
   size_t get_index(const loc_type& loc) const {
     assert(loc.first < num_blocks());
-    assert(loc.second < num_instrs(loc.first));
+    if (loc.second >= num_instrs(loc.first)) {
+      std::cout << loc.first << " " << loc.second << " " << num_instrs(loc.first) << "\n";
+      assert(loc.second < num_instrs(loc.first));
+    }
     return blocks_[loc.first] + loc.second;
   }
   /** Returns the location in this graph that an index in the underlying code corresponds to. */
@@ -290,10 +293,20 @@ public:
     assert(idx < get_code().size());
     return preds_instrs_[idx].begin();
   }
-  /** Returns an iterator that points to the end of this block's predecessor list. */
+
   pred_instr_iterator pred_end_instr(loc_type id) const {
     assert(id.first < num_blocks());
     auto idx = get_index(id);
+    assert(idx < get_code().size());
+    return preds_instrs_[idx].end();
+  }
+
+  pred_instr_iterator pred_begin_instr(size_t idx) const {
+    assert(idx < get_code().size());
+    return preds_instrs_[idx].begin();
+  }
+
+  pred_instr_iterator pred_end_instr(size_t idx) const {
     assert(idx < get_code().size());
     return preds_instrs_[idx].end();
   }

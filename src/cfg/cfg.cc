@@ -224,22 +224,32 @@ void Cfg::recompute_preds() {
 
 void Cfg::recompute_preds_instrs() {
   preds_instrs_.resize(get_code().size()+1);
-  for (auto& p : preds_instrs_) {
+  for (auto& p : preds_instrs_)
     p.clear();
-  }
 
   for (auto i = get_entry(), ie = get_exit(); i < ie; ++i) {
-    for (size_t j = 1, je = num_instrs(i); j < je; ++j) {
-      if (j != 0) {
-        const auto idx = get_index({i, j});
-        preds_instrs_[idx].push_back({i, idx-1});
-      } else {
+    cout << "Block: " << i << ", #instr: " << num_instrs(i) << "\n";
+    for (size_t j = 0, je = num_instrs(i); j < je; ++j) {
+      if (j == 0) {
         for (auto p = pred_begin(i), pe = pred_end(i); p != pe; ++p) {
-          preds_instrs_[get_index({i, 0})].push_back({*p, je-1});
+          preds_instrs_[get_index({i, 0})].push_back({*p, num_instrs(*p)-1});
         }
+      } else {
+        preds_instrs_[get_index({i, j})].push_back({i, j-1});
       }
     }
   }
+#ifdef DEBUG_CFG_RD
+  std::cout << "\tTesting Predecessors Iterators:\n=====================\n\n";
+  for (size_t k = 0 ; k < get_code().size(); k++) {
+    std::cout << get_code()[k] << "\n";
+    std::cout << "\tpredecessors:\n";
+    for (auto p = pred_begin_instr(k), pe = pred_end_instr(k); p != pe; ++p) {
+      std::cout << "\t\t" << (*p).first << " " << (*p).second << "\n";
+      //std::cout << "\t\t" << get_code()[get_index(*p)] << "\n";
+    }
+  }
+#endif
 }
 
 void Cfg::recompute_reachable() {
@@ -313,34 +323,6 @@ void Cfg::recompute_reaching_defs_in_gen_kill() {
       }
     }
   }
-
-#ifdef DEBUG_CFG_RD
-  for (size_t k = 0 ; k < get_code().size(); k++) {
-    std::cout << get_code()[k] << "\n";
-    auto gen_rs = reaching_defs_in_gen_[k];
-    auto kill_rs = reaching_defs_in_kill_[k];
-
-    std::cout << "\tgen-set: \n";
-    for (size_t i = 0 ; i < gen_rs.size(); i++) {
-      if (gen_rs[i] != RegSet::empty()) {
-        std::cout << "\t\t[\n";
-        std::cout << "\t\t\t" << get_code()[i] << "\n";
-        std::cout << "\t\t\t\t" << gen_rs[i] << "\n";
-        std::cout << "\t\t]\n\n";
-      }
-    }
-
-    std::cout << "\tkill-set: \n";
-    for (size_t i = 0 ; i < kill_rs.size(); i++) {
-      if (kill_rs[i] != RegSet::empty()) {
-        std::cout << "\t\t[\n";
-        std::cout << "\t\t\t" << get_code()[i] << "\n";
-        std::cout << "\t\t\t\t" << kill_rs[i] << "\n";
-        std::cout << "\t\t]\n\n";
-      }
-    }
-  }
-#endif
 }
 
 void Cfg::recompute_reaching_defs_in() {
@@ -368,7 +350,10 @@ void Cfg::recompute_reaching_defs_in() {
 
         if (j == 0) { // Do Meet of the predecessors
           for (auto p = pred_begin_instr({*i, j}), pe = pred_end_instr({*i, j}); p != pe; ++p) {
-            reaching_defs_in_[idx] |= reaching_defs_out_[get_index(*p)];
+            if ((*p).first == get_entry())
+              reaching_defs_in_[idx] |= reaching_defs_out_[get_entry()];
+            else
+              reaching_defs_in_[idx] |= reaching_defs_out_[get_index(*p)];
           }
         } else {
           reaching_defs_in_[idx] = reaching_defs_out_[idx-1];
@@ -383,6 +368,57 @@ void Cfg::recompute_reaching_defs_in() {
       }
     }
   }
+
+#ifdef DEBUG_CFG_RD
+  for (size_t k = 0 ; k < get_code().size(); k++) {
+    std::cout << get_code()[k] << "\n";
+    auto rd_def_in_ = reaching_defs_in_[k];
+    auto rd_def_out_ = reaching_defs_out_[k];
+    auto gen_rs = reaching_defs_in_gen_[k];
+    auto kill_rs = reaching_defs_in_kill_[k];
+
+    std::cout << "\tgen-set: \n";
+    for (size_t i = 0 ; i < gen_rs.size(); i++) {
+      if (gen_rs[i] != RegSet::empty()) {
+        std::cout << "\t\t[\n";
+        std::cout << "\t\t\t" << get_code()[i] << "\n";
+        std::cout << "\t\t\t\t" << gen_rs[i] << "\n";
+        std::cout << "\t\t]\n\n";
+      }
+    }
+
+    std::cout << "\tkill-set: \n";
+    for (size_t i = 0 ; i < kill_rs.size(); i++) {
+      if (kill_rs[i] != RegSet::empty()) {
+        std::cout << "\t\t[\n";
+        std::cout << "\t\t\t" << get_code()[i] << "\n";
+        std::cout << "\t\t\t\t" << kill_rs[i] << "\n";
+        std::cout << "\t\t]\n\n";
+      }
+    }
+
+    std::cout << "\treaching_defs_in_: \n";
+    for (size_t i = 0 ; i < rd_def_in_.size(); i++) {
+      if (rd_def_in_[i] != RegSet::empty()) {
+        std::cout << "\t\t[\n";
+        std::cout << "\t\t\t" << get_code()[i] << "\n";
+        std::cout << "\t\t\t\t" << rd_def_in_[i] << "\n";
+        std::cout << "\t\t]\n\n";
+      }
+    }
+
+    std::cout << "\treaching_defs_out_: \n";
+    for (size_t i = 0 ; i < rd_def_out_.size(); i++) {
+      if (rd_def_out_[i] != RegSet::empty()) {
+        std::cout << "\t\t[\n";
+        std::cout << "\t\t\t" << get_code()[i] << "\n";
+        std::cout << "\t\t\t\t" << rd_def_out_[i] << "\n";
+        std::cout << "\t\t]\n\n";
+      }
+    }
+  }
+#endif
+
 }
 
 void Cfg::recompute_defs_gen_kill() {
