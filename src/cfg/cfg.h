@@ -394,7 +394,6 @@ public:
   Dfv_RD reaching_defs_in(id_type id) const {
     assert(is_reachable(id));
     return reaching_defs_in_[get_index({id, 0})];
-    //return reaching_defs_in_kill_[get_index({id, 0})];
   }
 
   /** Returns the set of instrucions along with the register
@@ -403,7 +402,11 @@ public:
   Dfv_RD reaching_defs_in(const loc_type& loc) const {
     assert(is_reachable(loc.first));
     return reaching_defs_in_[get_index(loc)];
-    //return reaching_defs_in_kill_[get_index(loc)];
+  }
+
+  Dfv_RD reaching_and_used_defs_in(const loc_type& loc) const {
+    assert(is_reachable(loc.first));
+    return reaching_and_used_defs_in_[get_index(loc)];
   }
 
   /** Returns the set of registers that are defined on entry to this graph. */
@@ -537,7 +540,7 @@ public:
       const auto& lbl = instr.get_operand<x64asm::Label>(0);
       const auto found = fncs_summary.find(lbl);
       if (found != fncs_summary.end()) {
-        // we do: use it, instead of linux calling convention
+        //!l!=
         return found->second.must_undef_set;
       }
     }
@@ -631,10 +634,17 @@ private:
   /** Scratch space for computing reachability. */
   std::vector<id_type> work_list_;
 
-  /** The set of reaching definitions to every instruction.
+  /** The set of reaching definitions to the beginning and end of every instruction.
     The final element refers to the exit block. */
   std::vector<Dfv_RD> reaching_defs_in_;
   std::vector<Dfv_RD> reaching_defs_out_;
+
+  /** Even though there might be many definitons reaching a particular program
+    point, but a data flow graph cares only about the ones which are used at that
+    program point */
+  std::vector<Dfv_RD> reaching_and_used_defs_in_;
+
+
   /** The set of registers defined in for every instruction. The final element refers to the exit block. */
   std::vector<x64asm::RegSet> def_ins_;
   /** The set of registers defined out of every block. */

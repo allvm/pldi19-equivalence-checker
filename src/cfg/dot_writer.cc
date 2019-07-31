@@ -170,7 +170,7 @@ void DotWriter::plot_dfg(ostream& os, const Cfg& cfg) const {
   for (auto i = ++cfg.reachable_begin(), ie = cfg.reachable_end(); i != ie; ++i) {
     for (size_t j = 0, je = cfg.num_instrs(*i); j < je; ++j) {
       const auto idx = cfg.get_index({*i, j});
-      auto rd_ins = cfg.reaching_defs_in({*i, j});
+      auto rd_ins = cfg.reaching_and_used_defs_in({*i, j});
 
       for (size_t k = 0 ; k < rd_ins.size(); k++) {
         if (rd_ins[k] == RegSet::empty()) {

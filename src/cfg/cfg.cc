@@ -369,6 +369,23 @@ void Cfg::recompute_reaching_defs_in() {
     }
   }
 
+  // Find the reaching defintions which are actually used at the program points
+  reaching_and_used_defs_in_.resize(get_code().size() + 1, Dfv_RD(get_code().size(), RegSet::empty()));
+  for (auto i = ++reachable_begin(), ie = reachable_end(); i != ie; ++i) {
+    for (size_t j = 0, je = num_instrs(*i); j < je; ++j) {
+      const auto idx = get_index({*i, j});
+      auto rd_ins = reaching_defs_in({*i, j});
+      auto read_set = maybe_read_set(get_code()[idx]);
+
+      for (size_t k = 0 ; k < rd_ins.size(); k++) {
+        if (rd_ins[k] == RegSet::empty()) {
+          continue;
+        }
+        reaching_and_used_defs_in_[idx][k] = rd_ins[k] & read_set;
+      }
+    }
+  }
+
 #ifdef DEBUG_CFG_RD
   for (size_t k = 0 ; k < get_code().size(); k++) {
     std::cout << get_code()[k] << "\n";
