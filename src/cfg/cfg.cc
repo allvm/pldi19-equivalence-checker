@@ -305,20 +305,12 @@ void Cfg::recompute_reaching_defs_in_gen_kill() {
       kill = RegSet::empty();
       kill |= must_write_set(get_code()[idx]);
       kill -= maybe_undef_set(get_code()[idx]);
-      //cout << "Finding Kill set for " << get_code()[idx] << "\n";
-      //cout << "\tKill Set " << kill << "\n";
 
       for (size_t k = 0 ; k < get_code().size(); k++) {
         if (k == idx) continue;
 
         gen = reaching_defs_in_gen_[k][k];
         auto aux_kill = gen & kill;
-        //cout << "Queying gen set for " << get_code()[k] << "\n";
-        //cout << "\tGen Set " << gen << "\n";
-        //cout << "\tInsersection " << aux_kill << "\n";
-        //if(aux_kill != RegSet::empty()) {
-        //  cout << "Found: " << aux_kill << "\n";
-        //}
         reaching_defs_in_kill_[idx][k] = aux_kill;
       }
     }
@@ -393,6 +385,26 @@ void Cfg::recompute_reaching_defs_in() {
     auto rd_def_out_ = reaching_defs_out_[k];
     auto gen_rs = reaching_defs_in_gen_[k];
     auto kill_rs = reaching_defs_in_kill_[k];
+
+    auto must_write = must_write_set(get_code()[k]);
+    auto may_write  = maybe_write_set(get_code()[k]);
+
+    auto must_read = must_read_set(get_code()[k]);
+    auto may_read  =  maybe_read_set(get_code()[k]);
+
+    auto must_undef = must_undef_set(get_code()[k]);
+    auto may_undef  = maybe_undef_set(get_code()[k]);
+
+    std::cout << "\twrite-set: \n";
+    std::cout << "\t\tMust: [" << must_write << "]\n";
+    std::cout << "\t\tMay: [" << may_write <<  "]\n";
+    std::cout << "\tread-set: \n";
+    std::cout << "\t\tMust: [" << must_read << "]\n";
+    std::cout << "\t\tMay: [" << may_read <<  "]\n";
+    std::cout << "\tundef-set: \n";
+    std::cout << "\t\tMust: [" << must_undef << "]\n";
+    std::cout << "\t\tMay: [" << may_undef <<  "]\n";
+    std::cout << "\n\n";
 
     std::cout << "\tgen-set: \n";
     for (size_t i = 0 ; i < gen_rs.size(); i++) {
