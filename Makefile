@@ -259,6 +259,7 @@ BIN=\
 	bin/stoke_testcase \
 	bin/stoke_tcgen \
 	bin/stoke_debug_cfg \
+	bin/stoke_debug_instruction_rwset \
 	bin/stoke_debug_invariant \
 	bin/stoke_debug_sandbox \
 	bin/stoke_debug_verify \
