@@ -282,8 +282,8 @@ void Cfg::recompute_reachable() {
   and the content of reaching_defs_in_gen_i][j] is the regs if j which are killed by i
 */
 void Cfg::recompute_reaching_defs_in_gen_kill() {
-  reaching_defs_in_gen_.resize(get_code().size() + 1, Dfv_RD(get_code().size(), RegSet::empty()));
-  reaching_defs_in_kill_.resize(get_code().size() + 1, Dfv_RD(get_code().size(), RegSet::empty()));
+  reaching_defs_in_gen_.resize(get_code().size() + 1, Dfv_RD(get_code().size() + 1, RegSet::empty()));
+  reaching_defs_in_kill_.resize(get_code().size() + 1, Dfv_RD(get_code().size() + 1, RegSet::empty()));
   x64asm::RegSet gen, kill, aux_kill;
 
   // Find the gen set for all instructions
@@ -293,7 +293,7 @@ void Cfg::recompute_reaching_defs_in_gen_kill() {
       gen = RegSet::empty();
       gen |= must_write_set(get_code()[idx]);
       gen -= maybe_undef_set(get_code()[idx]);
-      reaching_defs_in_gen_[idx][idx] = gen;
+      reaching_defs_in_gen_[idx][idx+1] = gen;
     }
   }
 
@@ -306,12 +306,16 @@ void Cfg::recompute_reaching_defs_in_gen_kill() {
       kill |= must_write_set(get_code()[idx]);
       kill -= maybe_undef_set(get_code()[idx]);
 
-      for (size_t k = 0 ; k < get_code().size(); k++) {
-        if (k == idx) continue;
+      for (size_t k = 0 ; k < get_code().size() + 1; k++) {
+        if (k == idx + 1) continue;
 
-        gen = reaching_defs_in_gen_[k][k];
-        auto aux_kill = gen & kill;
-        reaching_defs_in_kill_[idx][k] = aux_kill;
+        if(k == 0) {
+          reaching_defs_in_kill_[idx][k] = kill;
+        } else {
+          gen = reaching_defs_in_gen_[k-1][k];
+          auto aux_kill = gen & kill;
+          reaching_defs_in_kill_[idx][k] = aux_kill;
+        }
       }
     }
   }
@@ -320,8 +324,8 @@ void Cfg::recompute_reaching_defs_in_gen_kill() {
 void Cfg::recompute_reaching_defs_in() {
   recompute_reaching_defs_in_gen_kill();
 
-  reaching_defs_in_.resize(get_code().size() + 1, Dfv_RD(get_code().size(), RegSet::empty()));
-  reaching_defs_out_.resize(get_code().size() + 1,Dfv_RD(get_code().size(), RegSet::empty()));
+  reaching_defs_in_.resize(get_code().size() + 1, Dfv_RD(get_code().size() + 1, RegSet::empty()));
+  reaching_defs_out_.resize(get_code().size() + 1,Dfv_RD(get_code().size() + 1, RegSet::empty()));
 
   // Boundary conditions
   //def_outs_[get_entry()] = fxn_def_ins_;
@@ -362,7 +366,7 @@ void Cfg::recompute_reaching_defs_in() {
   }
 
   // Find the reaching defintions which are actually used at the program points
-  reaching_and_used_defs_in_.resize(get_code().size() + 1, Dfv_RD(get_code().size(), RegSet::empty()));
+  reaching_and_used_defs_in_.resize(get_code().size() + 1, Dfv_RD(get_code().size() + 1, RegSet::empty()));
   for (auto i = ++reachable_begin(), ie = reachable_end(); i != ie; ++i) {
     for (size_t j = 0, je = num_instrs(*i); j < je; ++j) {
       const auto idx = get_index({*i, j});
@@ -385,6 +389,7 @@ void Cfg::recompute_reaching_defs_in() {
     auto rd_def_out_ = reaching_defs_out_[k];
     auto gen_rs = reaching_defs_in_gen_[k];
     auto kill_rs = reaching_defs_in_kill_[k];
+    auto rd_def_in_used_ = reaching_and_used_defs_in_[k];
 
     auto must_write = must_write_set(get_code()[k]);
     auto may_write  = maybe_write_set(get_code()[k]);
@@ -408,19 +413,25 @@ void Cfg::recompute_reaching_defs_in() {
 
     std::cout << "\tgen-set: \n";
     for (size_t i = 0 ; i < gen_rs.size(); i++) {
-      if (gen_rs[i] != RegSet::empty()) {
-        std::cout << "\t\t[\n";
-        std::cout << "\t\t\t" << get_code()[i] << "\n";
-        std::cout << "\t\t\t\t" << gen_rs[i] << "\n";
-        std::cout << "\t\t]\n\n";
-      }
+      if (gen_rs[i] == RegSet::empty()) continue;
+
+      std::cout << "\t\t[\n";
+      if (i == 0)
+        std::cout << "\t\t\t" << "E0" << "\n";
+      else
+        std::cout << "\t\t\t" << get_code()[i-1] << "\n";
+      std::cout << "\t\t\t\t" <<  gen_rs[i] << "\n";
+      std::cout << "\t\t]\n\n";
     }
 
     std::cout << "\tkill-set: \n";
     for (size_t i = 0 ; i < kill_rs.size(); i++) {
       if (kill_rs[i] != RegSet::empty()) {
         std::cout << "\t\t[\n";
-        std::cout << "\t\t\t" << get_code()[i] << "\n";
+        if (i == 0)
+          std::cout << "\t\t\t" << "E0" << "\n";
+        else
+          std::cout << "\t\t\t" << get_code()[i-1] << "\n";
         std::cout << "\t\t\t\t" << kill_rs[i] << "\n";
         std::cout << "\t\t]\n\n";
       }
@@ -430,7 +441,12 @@ void Cfg::recompute_reaching_defs_in() {
     for (size_t i = 0 ; i < rd_def_in_.size(); i++) {
       if (rd_def_in_[i] != RegSet::empty()) {
         std::cout << "\t\t[\n";
-        std::cout << "\t\t\t" << get_code()[i] << "\n";
+
+        if (i == 0)
+          std::cout << "\t\t\t" << "E0" << "\n";
+        else
+          std::cout << "\t\t\t" << get_code()[i-1] << "\n";
+
         std::cout << "\t\t\t\t" << rd_def_in_[i] << "\n";
         std::cout << "\t\t]\n\n";
       }
@@ -440,12 +456,31 @@ void Cfg::recompute_reaching_defs_in() {
     for (size_t i = 0 ; i < rd_def_out_.size(); i++) {
       if (rd_def_out_[i] != RegSet::empty()) {
         std::cout << "\t\t[\n";
-        std::cout << "\t\t\t" << get_code()[i] << "\n";
+        if (i == 0)
+          std::cout << "\t\t\t" << "E0" << "\n";
+        else
+          std::cout << "\t\t\t" << get_code()[i-1] << "\n";
+
         std::cout << "\t\t\t\t" << rd_def_out_[i] << "\n";
         std::cout << "\t\t]\n\n";
       }
     }
+
+    std::cout << "\treaching_defs_in_used_: \n";
+    for (size_t i = 0 ; i < rd_def_in_used_.size(); i++) {
+      if (rd_def_in_used_[i] != RegSet::empty()) {
+        std::cout << "\t\t[\n";
+        if (i == 0)
+          std::cout << "\t\t\t" << "E0" << "\n";
+        else
+          std::cout << "\t\t\t" << get_code()[i-1] << "\n";
+
+        std::cout << "\t\t\t\t" << rd_def_in_used_[i] << "\n";
+        std::cout << "\t\t]\n\n";
+      }
+    }
   }
+
 #endif
 
 }

@@ -19,8 +19,8 @@
 #include <stdint.h>
 
 #include <map>
-#include <stack>
 #include <sstream>
+#include <stack>
 #include <unordered_map>
 #include <vector>
 
@@ -35,19 +35,32 @@ namespace stoke {
 class Dfv_RD {
 private:
   std::vector<x64asm::RegSet> DFV;
+
 public:
-  Dfv_RD(size_t n, x64asm::RegSet rs = x64asm::RegSet::empty()) {
+  Dfv_RD(size_t n, x64asm::RegSet rs = x64asm::RegSet::empty(),
+         bool entry_set_empty = true) {
     DFV.resize(n, rs);
+
+    if (!entry_set_empty) {
+      x64asm::RegSet rs =
+        (x64asm::RegSet::all_gps() | x64asm::RegSet::all_ymms()) +
+        x64asm::Constants::eflags_cf() + x64asm::Constants::eflags_sf() +
+        x64asm::Constants::eflags_zf() + x64asm::Constants::eflags_of() +
+        x64asm::Constants::eflags_pf() + x64asm::Constants::eflags_af();
+
+      DFV[0] = rs;
+    }
   }
+
   size_t size() const {
     return DFV.size();
   }
-  const x64asm::RegSet& operator[](size_t index) const {
+  const x64asm::RegSet &operator[](size_t index) const {
     assert(index < DFV.size() && "Array OOB!!");
     return DFV[index];
   }
 
-  x64asm::RegSet& operator[](size_t index)  {
+  x64asm::RegSet &operator[](size_t index) {
     assert(index < DFV.size() && "Array OOB!!");
     return DFV[index];
   }
@@ -57,7 +70,7 @@ public:
     size_t n = size();
     assert(n == rhs.size() && "Size mismatch on operator |\n");
     auto retval = Dfv_RD(n);
-    for (size_t i = 0 ; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
       retval[i] = DFV[i] | rhs[i];
     }
 
@@ -65,12 +78,12 @@ public:
   }
 
   /** Set union. */
-  Dfv_RD operator|=(const Dfv_RD &rhs)  {
+  Dfv_RD operator|=(const Dfv_RD &rhs) {
     size_t n = size();
     assert(n == rhs.size() && "Size mismatch on operator |\n");
 
-    for (size_t i = 0 ; i < n; i++) {
-      DFV[i] |=  rhs[i];
+    for (size_t i = 0; i < n; i++) {
+      DFV[i] |= rhs[i];
     }
 
     return *this;
@@ -81,7 +94,7 @@ public:
     size_t n = size();
     assert(n == rhs.size() && "Size mismatch on operator |\n");
     auto retval = Dfv_RD(n);
-    for (size_t i = 0 ; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
       retval[i] = DFV[i] & rhs[i];
     }
 
@@ -89,22 +102,22 @@ public:
   }
 
   /** Set intersection. */
-  Dfv_RD operator&=(const Dfv_RD &rhs)  {
+  Dfv_RD operator&=(const Dfv_RD &rhs) {
     size_t n = size();
     assert(n == rhs.size() && "Size mismatch on operator |\n");
 
-    for (size_t i = 0 ; i < n; i++) {
-      DFV[i] &=  rhs[i];
+    for (size_t i = 0; i < n; i++) {
+      DFV[i] &= rhs[i];
     }
 
     return *this;
   }
 
   /** Set inversion. */
-  Dfv_RD operator~()  const {
+  Dfv_RD operator~() const {
     size_t n = size();
     auto retval = Dfv_RD(n);
-    for (size_t i = 0 ; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
       retval[i] = ~DFV[i];
     }
 
@@ -117,26 +130,26 @@ public:
   }
 
   /** Set equality. */
-  bool operator==(const Dfv_RD& rhs) const {
+  bool operator==(const Dfv_RD &rhs) const {
     size_t n = size();
     assert(n == rhs.size() && "Size mismatch on operator |\n");
-    for (size_t i = 0 ; i < n; i++) {
-      if (DFV[i] != rhs[i]) return false;
+    for (size_t i = 0; i < n; i++) {
+      if (DFV[i] != rhs[i])
+        return false;
     }
 
     return true;
   }
 
   /** Set inequality. */
-  bool operator!=(const Dfv_RD& rhs) const {
+  bool operator!=(const Dfv_RD &rhs) const {
     return !(*this == rhs);
   }
 
   /** Set containment. */
-  bool contains(const Dfv_RD& rhs) const {
+  bool contains(const Dfv_RD &rhs) const {
     return (*this & rhs) == rhs;
   }
-
 };
 
 class Cfg {
@@ -174,23 +187,27 @@ public:
   /** A map from labels to the dataflow summary of that function. */
   std::unordered_map<x64asm::Label, DataflowSummary> fncs_summary;
 
-  /** Creates a new control flow graph; NOT guaranteed to pass invariant check! */
-  explicit Cfg(const TUnit& function,
-               const x64asm::RegSet& def_ins = x64asm::RegSet::empty(),
-               const x64asm::RegSet& live_outs = x64asm::RegSet::empty()) :
-    function_(function), fxn_def_ins_(def_ins), fxn_live_outs_(live_outs),
-    fxn_reaching_defs_ins_(get_code().size(), x64asm::RegSet::empty()) {
+  /** Creates a new control flow graph; NOT guaranteed to pass invariant check!
+   */
+  explicit Cfg(const TUnit &function,
+               const x64asm::RegSet &def_ins = x64asm::RegSet::empty(),
+               const x64asm::RegSet &live_outs = x64asm::RegSet::empty())
+    : function_(function), fxn_def_ins_(def_ins), fxn_live_outs_(live_outs),
+      fxn_reaching_defs_ins_(1 + get_code().size(), x64asm::RegSet::empty(),
+                             false) {
     recompute();
   }
 
-  /** Recompute internal state; recomputes basic block structure and data flow values. */
+  /** Recompute internal state; recomputes basic block structure and data flow
+   * values. */
   void recompute() {
     recompute_structure();
     recompute_defs();
     recompute_reaching_defs_in();
     recompute_liveness();
   }
-  /** Recompute graph structure; modifying control flow will invalidate this state, calling this
+  /** Recompute graph structure; modifying control flow will invalidate this
+    state, calling this
     method will restore it. */
   void recompute_structure() {
     recompute_blocks();
@@ -200,31 +217,36 @@ public:
     recompute_preds_instrs();
     recompute_reachable();
   }
-  /** Recomputes the defined-in relation for instructions; modifying an instruction will invalidate
-    this relation, calling this method will restore it. Undefined if graph structure is not up to
+  /** Recomputes the defined-in relation for instructions; modifying an
+    instruction will invalidate
+    this relation, calling this method will restore it. Undefined if graph
+    structure is not up to
     date. */
   void recompute_defs();
 
-  /** Recomputes the reaching defs-in relation for instructions; modifying an instruction will invalidate
-    this relation, calling this method will restore it. Undefined if graph structure is not up to
+  /** Recomputes the reaching defs-in relation for instructions; modifying an
+    instruction will invalidate
+    this relation, calling this method will restore it. Undefined if graph
+    structure is not up to
     date. */
   void recompute_reaching_defs_in();
 
   /** Return a reference to the function underlying this graph. */
-  TUnit& get_function() {
+  TUnit &get_function() {
     return function_;
   }
   /** Return a const reference to the function underlying this graph. */
-  const TUnit& get_function() const {
+  const TUnit &get_function() const {
     return function_;
   }
 
   /** Return a const reference to the code underlying this graph. */
-  const x64asm::Code& get_code() const {
+  const x64asm::Code &get_code() const {
     return get_function().get_code();
   }
 
-  /** Returns the number of basic blocks in this graph; includes entry and exit. */
+  /** Returns the number of basic blocks in this graph; includes entry and exit.
+   */
   size_t num_blocks() const {
     return blocks_.size() - 1;
   }
@@ -234,16 +256,19 @@ public:
     return blocks_[id + 1] - blocks_[id];
   }
 
-  /** Returns the index in the underlying code that a location corresponds to. */
-  size_t get_index(const loc_type& loc) const {
+  /** Returns the index in the underlying code that a location corresponds to.
+   */
+  size_t get_index(const loc_type &loc) const {
     assert(loc.first < num_blocks());
     if (loc.second >= num_instrs(loc.first)) {
-      std::cout << loc.first << " " << loc.second << " " << num_instrs(loc.first) << "\n";
+      std::cout << loc.first << " " << loc.second << " "
+                << num_instrs(loc.first) << "\n";
       assert(loc.second < num_instrs(loc.first));
     }
     return blocks_[loc.first] + loc.second;
   }
-  /** Returns the location in this graph that an index in the underlying code corresponds to. */
+  /** Returns the location in this graph that an index in the underlying code
+   * corresponds to. */
   loc_type get_loc(size_t idx) const;
 
   /** Returns the id of the entry block. */
@@ -264,16 +289,17 @@ public:
     return id == get_exit();
   }
 
-  /** Returns a const reference to the instruction in the underlying code at this location. */
-  const x64asm::Instruction& get_instr(const loc_type& loc) const {
+  /** Returns a const reference to the instruction in the underlying code at
+   * this location. */
+  const x64asm::Instruction &get_instr(const loc_type &loc) const {
     assert(get_index(loc) < get_code().size());
     return get_code()[get_index(loc)];
   }
 
   /** Returns the last instruction in a nonempty block. */
-  const x64asm::Instruction& get_last_of_block(Cfg::id_type blk) const {
+  const x64asm::Instruction &get_last_of_block(Cfg::id_type blk) const {
     assert(num_instrs(blk) > 0);
-    return get_instr({blk, num_instrs(blk)-1});
+    return get_instr({blk, num_instrs(blk) - 1});
   }
 
   /** Returns an iterator that points to the beginning of this basic block. */
@@ -311,23 +337,27 @@ public:
     return preds_instrs_[idx].end();
   }
 
-  /** Returns an iterator that points to the beginning of this block's predecessor list. */
+  /** Returns an iterator that points to the beginning of this block's
+   * predecessor list. */
   pred_iterator pred_begin(id_type id) const {
     assert(id < num_blocks());
     return preds_[id].begin();
   }
-  /** Returns an iterator that points to the end of this block's predecessor list. */
+  /** Returns an iterator that points to the end of this block's predecessor
+   * list. */
   pred_iterator pred_end(id_type id) const {
     assert(id < num_blocks());
     return preds_[id].end();
   }
 
-  /** Returns an iterator that points to the beginning of this block's successor list. */
+  /** Returns an iterator that points to the beginning of this block's successor
+   * list. */
   succ_iterator succ_begin(id_type id) const {
     assert(id < num_blocks());
     return succs_[id].begin();
   }
-  /** Returns an iterator that points to the end of this block's successor list. */
+  /** Returns an iterator that points to the end of this block's successor list.
+   */
   succ_iterator succ_end(id_type id) const {
     assert(id < num_blocks());
     return succs_[id].end();
@@ -338,26 +368,31 @@ public:
     return succs_[id].size();
   }
 
-  /** Returns true if control can pass from this basic block to another either because it is
-    not terminated by a jump instruction or it is terminated by a conditional jump instruction
+  /** Returns true if control can pass from this basic block to another either
+    because it is
+    not terminated by a jump instruction or it is terminated by a conditional
+    jump instruction
     that can fail. */
   bool has_fallthrough_target(id_type id) const {
     assert(id < num_blocks());
     return !succs_[id].empty();
   }
-  /** Returns the fallthrough target for this basic block; undefined if has_fallthrough_target()
+  /** Returns the fallthrough target for this basic block; undefined if
+    has_fallthrough_target()
     is false. */
   id_type fallthrough_target(id_type id) const {
     assert(has_fallthrough_target(id));
     return succs_[id][0];
   }
 
-  /** Returns true if the final instruction of this basic block is a conditional jump. */
+  /** Returns true if the final instruction of this basic block is a conditional
+   * jump. */
   bool has_conditional_target(id_type id) const {
     assert(id < num_blocks());
     return succs_[id].size() == 2;
   }
-  /** Returns the id of the basic block that a successful conditional jump will proceed to;
+  /** Returns the id of the basic block that a successful conditional jump will
+    proceed to;
     undefined if has_conditional_target() is false. */
   id_type conditional_target(id_type id) const {
     assert(has_conditional_target(id));
@@ -368,16 +403,19 @@ public:
   size_t num_reachable() const {
     return work_list_.size();
   }
-  /** Returns an iterator that points to the beginning of this graph's reachable block list. */
+  /** Returns an iterator that points to the beginning of this graph's reachable
+   * block list. */
   reachable_iterator reachable_begin() const {
     return reachable_.set_bit_index_begin();
   }
-  /** Returns an iterator that points to the end of this graph's reachable block list. */
+  /** Returns an iterator that points to the end of this graph's reachable block
+   * list. */
   reachable_iterator reachable_end() const {
     return reachable_.set_bit_index_end();
   }
 
-  /** Returns true if control can proceed normally from the entry block to this block. */
+  /** Returns true if control can proceed normally from the entry block to this
+   * block. */
   bool is_reachable(id_type id) const {
     assert(id < num_blocks());
     return reachable_[id];
@@ -389,7 +427,8 @@ public:
     return fxn_reaching_defs_ins_;
   }
 
-  /** Returns the set of registers that are defined on entry to a basic block; undefined for unreachable
+  /** Returns the set of registers that are defined on entry to a basic block;
+    undefined for unreachable
     blocks. */
   Dfv_RD reaching_defs_in(id_type id) const {
     assert(is_reachable(id));
@@ -399,12 +438,12 @@ public:
   /** Returns the set of instrucions along with the register
     that are defined on entry to an instruction; undefined for unreachable
     blocks. */
-  Dfv_RD reaching_defs_in(const loc_type& loc) const {
+  Dfv_RD reaching_defs_in(const loc_type &loc) const {
     assert(is_reachable(loc.first));
     return reaching_defs_in_[get_index(loc)];
   }
 
-  Dfv_RD reaching_and_used_defs_in(const loc_type& loc) const {
+  Dfv_RD reaching_and_used_defs_in(const loc_type &loc) const {
     assert(is_reachable(loc.first));
     return reaching_and_used_defs_in_[get_index(loc)];
   }
@@ -413,31 +452,36 @@ public:
   x64asm::RegSet def_ins() const {
     return fxn_def_ins_;
   }
-  /** Returns the set of registers that are defined on entry to a basic block; undefined for unreachable
+  /** Returns the set of registers that are defined on entry to a basic block;
+    undefined for unreachable
     blocks. */
   x64asm::RegSet def_ins(id_type id) const {
     assert(is_reachable(id));
     return def_ins_[get_index({id, 0})];
   }
-  /** Returns the set of registers that are defined on entry to an instruction; undefined for unreachable
+  /** Returns the set of registers that are defined on entry to an instruction;
+    undefined for unreachable
     blocks. */
-  x64asm::RegSet def_ins(const loc_type& loc) const {
+  x64asm::RegSet def_ins(const loc_type &loc) const {
     assert(is_reachable(loc.first));
     return def_ins_[get_index(loc)];
   }
   /** Returns the set of registers that are defined on exit from this graph. */
   x64asm::RegSet def_outs() const {
-    // Careful... this structure is organized by instruction index. The exit block is a special case.
+    // Careful... this structure is organized by instruction index. The exit
+    // block is a special case.
     return def_ins_.back();
   }
-  /** Returns the set of registers that are defined on output of a basic block */
+  /** Returns the set of registers that are defined on output of a basic block
+   */
   x64asm::RegSet def_outs(id_type id) const {
     assert(is_reachable(id));
     return def_outs_[id];
   }
-  /** Returns the set of registers that are live-out on exit to an instruction; undefined for unrachable
+  /** Returns the set of registers that are live-out on exit to an instruction;
+    undefined for unrachable
     blocks */
-  x64asm::RegSet live_outs(const loc_type& loc) const {
+  x64asm::RegSet live_outs(const loc_type &loc) const {
     assert(is_reachable(loc.first));
     return live_outs_[get_index(loc)];
   }
@@ -446,10 +490,10 @@ public:
       (undefined for unreachable blocks) */
   x64asm::RegSet live_outs(id_type id) const {
     if (id == 0) {
-      return live_outs({0,0});
+      return live_outs({0, 0});
     } else {
       assert(num_instrs(id) > 0);
-      return live_outs({id, num_instrs(id)-1});
+      return live_outs({id, num_instrs(id) - 1});
     }
   }
 
@@ -460,14 +504,15 @@ public:
 
   /** Returns the set of registers that are live-in to this graph. */
   x64asm::RegSet live_ins() const {
-    return live_ins(get_entry()+1);
+    return live_ins(get_entry() + 1);
   }
   /** Returns the set of registers that are live-in on entry a basic block. */
   x64asm::RegSet live_ins(id_type id) const {
     return live_ins({id, 0});
   }
-  /** Returns the set of registers that are live-in on entry to an instruction. */
-  x64asm::RegSet live_ins(const loc_type& loc) const {
+  /** Returns the set of registers that are live-in on entry to an instruction.
+   */
+  x64asm::RegSet live_ins(const loc_type &loc) const {
     assert(is_reachable(loc.first));
     return live_ins_[get_index(loc)];
   }
@@ -481,10 +526,8 @@ public:
   bool invariant_can_assemble() const;
   /** Check all invariants */
   bool check_invariants() const {
-    return invariant_no_undef_reads() &&
-           invariant_no_undef_live_outs() &&
-           invariant_can_assemble() &&
-           function_.check_invariants();
+    return invariant_no_undef_reads() && invariant_no_undef_live_outs() &&
+           invariant_can_assemble() && function_.check_invariants();
   }
 
   /** Explains what undefined value is read. */
@@ -493,23 +536,19 @@ public:
   /** Adds summary information about a call target to increase precision of the
     dataflow analysis.  The information is about function (callable by the given
     label), and is not meant to change over the lifetime of the Cfg. */
-  void add_summary(const x64asm::Label& label, const TUnit::MayMustSets& mms) {
+  void add_summary(const x64asm::Label &label, const TUnit::MayMustSets &mms) {
     fncs_summary[label] = {
-      mms.must_read_set,
-      mms.must_write_set,
-      mms.must_undef_set,
-      mms.maybe_read_set,
-      mms.maybe_write_set,
-      mms.maybe_undef_set,
+      mms.must_read_set,  mms.must_write_set,  mms.must_undef_set,
+      mms.maybe_read_set, mms.maybe_write_set, mms.maybe_undef_set,
     };
   }
 
   /** Dataflow information about an instruction (more precise for function calls
     that instr.must/maybe_read/write/undef_set). */
-  x64asm::RegSet must_read_set(const x64asm::Instruction& instr) const {
+  x64asm::RegSet must_read_set(const x64asm::Instruction &instr) const {
     // do we have more precise information available?
     if (instr.get_opcode() == x64asm::CALL_LABEL) {
-      const auto& lbl = instr.get_operand<x64asm::Label>(0);
+      const auto &lbl = instr.get_operand<x64asm::Label>(0);
       const auto found = fncs_summary.find(lbl);
       if (found != fncs_summary.end()) {
         // we do: use it, instead of linux calling convention
@@ -520,10 +559,10 @@ public:
   }
   /** Dataflow information about an instruction (more precise for function calls
     that instr.must/maybe_read/write/undef_set). */
-  x64asm::RegSet must_write_set(const x64asm::Instruction& instr) const {
+  x64asm::RegSet must_write_set(const x64asm::Instruction &instr) const {
     // do we have more precise information available?
     if (instr.get_opcode() == x64asm::CALL_LABEL) {
-      const auto& lbl = instr.get_operand<x64asm::Label>(0);
+      const auto &lbl = instr.get_operand<x64asm::Label>(0);
       const auto found = fncs_summary.find(lbl);
       if (found != fncs_summary.end()) {
         // we do: use it, instead of linux calling convention
@@ -534,13 +573,13 @@ public:
   }
   /** Dataflow information about an instruction (more precise for function calls
     that instr.must/maybe_read/write/undef_set). */
-  x64asm::RegSet must_undef_set(const x64asm::Instruction& instr) const {
+  x64asm::RegSet must_undef_set(const x64asm::Instruction &instr) const {
     // do we have more precise information available?
     if (instr.get_opcode() == x64asm::CALL_LABEL) {
-      const auto& lbl = instr.get_operand<x64asm::Label>(0);
+      const auto &lbl = instr.get_operand<x64asm::Label>(0);
       const auto found = fncs_summary.find(lbl);
       if (found != fncs_summary.end()) {
-        //!l!=
+        //! l!=
         return found->second.must_undef_set;
       }
     }
@@ -548,10 +587,10 @@ public:
   }
   /** Dataflow information about an instruction (more precise for function calls
     that instr.must/maybe_read/write/undef_set). */
-  x64asm::RegSet maybe_read_set(const x64asm::Instruction& instr) const {
+  x64asm::RegSet maybe_read_set(const x64asm::Instruction &instr) const {
     // do we have more precise information available?
     if (instr.get_opcode() == x64asm::CALL_LABEL) {
-      const auto& lbl = instr.get_operand<x64asm::Label>(0);
+      const auto &lbl = instr.get_operand<x64asm::Label>(0);
       const auto found = fncs_summary.find(lbl);
       if (found != fncs_summary.end()) {
         // we do: use it, instead of linux calling convention
@@ -562,10 +601,10 @@ public:
   }
   /** Dataflow information about an instruction (more precise for function calls
     that instr.must/maybe_read/write/undef_set). */
-  x64asm::RegSet maybe_write_set(const x64asm::Instruction& instr) const {
+  x64asm::RegSet maybe_write_set(const x64asm::Instruction &instr) const {
     // do we have more precise information available?
     if (instr.get_opcode() == x64asm::CALL_LABEL) {
-      const auto& lbl = instr.get_operand<x64asm::Label>(0);
+      const auto &lbl = instr.get_operand<x64asm::Label>(0);
       const auto found = fncs_summary.find(lbl);
       if (found != fncs_summary.end()) {
         // we do: use it, instead of linux calling convention
@@ -576,10 +615,10 @@ public:
   }
   /** Dataflow information about an instruction (more precise for function calls
     that instr.must/maybe_read/write/undef_set). */
-  x64asm::RegSet maybe_undef_set(const x64asm::Instruction& instr) const {
+  x64asm::RegSet maybe_undef_set(const x64asm::Instruction &instr) const {
     // do we have more precise information available?
     if (instr.get_opcode() == x64asm::CALL_LABEL) {
-      const auto& lbl = instr.get_operand<x64asm::Label>(0);
+      const auto &lbl = instr.get_operand<x64asm::Label>(0);
       const auto found = fncs_summary.find(lbl);
       if (found != fncs_summary.end()) {
         // we do: use it, instead of linux calling convention
@@ -589,7 +628,8 @@ public:
     return instr.maybe_undef_set();
   }
 
-  /** Deprecated: Use invariant_no_undef_reads() and invariant_no_undef_live_outs() */
+  /** Deprecated: Use invariant_no_undef_reads() and
+   * invariant_no_undef_live_outs() */
   bool performs_undef_read() const {
     return !invariant_no_undef_reads() || !invariant_no_undef_live_outs();
   }
@@ -598,8 +638,8 @@ public:
     return check_invariants();
   }
 
-  void serialize(std::ostream& os) const;
-  static Cfg deserialize(std::istream& os);
+  void serialize(std::ostream &os) const;
+  static Cfg deserialize(std::istream &os);
 
 private:
   /** User-specified underlying function. */
@@ -608,10 +648,12 @@ private:
   x64asm::RegSet fxn_def_ins_;
   /** User-specified registers that are defined on exit from this graph. */
   x64asm::RegSet fxn_live_outs_;
-  /** User-specified reaching-defs-in that are defined on entry to this graph. */
+  /** User-specified reaching-defs-in that are defined on entry to this graph.
+   */
   Dfv_RD fxn_reaching_defs_ins_;
 
-  // This temporary state is maintained to reduce the overhead of repeated allocations
+  // This temporary state is maintained to reduce the overhead of repeated
+  // allocations
 
   /** A set of indices that correspond to the beginning of basic blocks. */
   cpputil::BitVector boundaries_;
@@ -622,7 +664,8 @@ private:
   /** A map from labels to the basic blocks they mark the beginning of. */
   std::unordered_map<x64asm::Label, size_t> labels_;
 
-  /** A list of the indices that correspond to the first instruction in each basic block. */
+  /** A list of the indices that correspond to the first instruction in each
+   * basic block. */
   std::vector<size_t> blocks_;
   /** Basic block predecessor lists. */
   std::vector<std::vector<id_type>> preds_;
@@ -634,18 +677,20 @@ private:
   /** Scratch space for computing reachability. */
   std::vector<id_type> work_list_;
 
-  /** The set of reaching definitions to the beginning and end of every instruction.
+  /** The set of reaching definitions to the beginning and end of every
+    instruction.
     The final element refers to the exit block. */
   std::vector<Dfv_RD> reaching_defs_in_;
   std::vector<Dfv_RD> reaching_defs_out_;
 
   /** Even though there might be many definitons reaching a particular program
-    point, but a data flow graph cares only about the ones which are used at that
+    point, but a data flow graph cares only about the ones which are used at
+    that
     program point */
   std::vector<Dfv_RD> reaching_and_used_defs_in_;
 
-
-  /** The set of registers defined in for every instruction. The final element refers to the exit block. */
+  /** The set of registers defined in for every instruction. The final element
+   * refers to the exit block. */
   std::vector<x64asm::RegSet> def_ins_;
   /** The set of registers defined out of every block. */
   std::vector<x64asm::RegSet> def_outs_;
@@ -658,7 +703,8 @@ private:
   /** The kill set for each instruction. */
   std::vector<Dfv_RD> reaching_defs_in_kill_;
 
-  /** The set of registers live out for every instruction. The final element refers to the eit block. */
+  /** The set of registers live out for every instruction. The final element
+   * refers to the eit block. */
   std::vector<x64asm::RegSet> live_outs_;
   /** The set of registers live in at each instruction */
   std::vector<x64asm::RegSet> live_ins_;
@@ -670,14 +716,18 @@ private:
   /** Recompute the indices in blocks_. */
   void recompute_blocks();
 
-  /** Recompute the label-index pairs in labels_; assumes blocks_ is up to date. */
+  /** Recompute the label-index pairs in labels_; assumes blocks_ is up to date.
+   */
   void recompute_labels();
-  /** Recompute the contents of succs_; assumes blocks_ and labels_ are up to date. */
+  /** Recompute the contents of succs_; assumes blocks_ and labels_ are up to
+   * date. */
   void recompute_succs();
-  /** Recompute the contents of preds_; assumes blocks_ and succs_ are up to date. */
+  /** Recompute the contents of preds_; assumes blocks_ and succs_ are up to
+   * date. */
   void recompute_preds();
   void recompute_preds_instrs();
-  /** Recompute the contents of reachable_; assumes blocks_ and succs_ are up to date. */
+  /** Recompute the contents of reachable_; assumes blocks_ and succs_ are up to
+   * date. */
   void recompute_reachable();
 
   /** Recomputes the gen and kill sets used by recompute_defs(). */
@@ -695,9 +745,6 @@ private:
   static x64asm::Assembler assembler_;
   /** Buffer for assembler. */
   static x64asm::Function buffer_;
-
-
-
 };
 
 } // namespace stoke

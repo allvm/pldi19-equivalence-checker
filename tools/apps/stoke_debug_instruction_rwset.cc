@@ -40,13 +40,13 @@ using namespace x64asm;
 
 auto &content = Heading::create("Content Options:");
 auto &use_smtlib_format_arg = FlagArg::create("smtlib_format")
-                                  .description("Show formula in smtlib format");
+                              .description("Show formula in smtlib format");
 cpputil::ValueArg<std::string> &strata_path_arg =
-    cpputil::ValueArg<std::string>::create("strata_path")
-        .usage("<path/to/dir>")
-        .description("The path to the directory with the strata circuits (a "
-                     "collection of .s files)")
-        .default_val("");
+  cpputil::ValueArg<std::string>::create("strata_path")
+  .usage("<path/to/dir>")
+  .description("The path to the directory with the strata circuits (a "
+               "collection of .s files)")
+  .default_val("");
 
 template <typename T>
 string out_padded(T t, size_t min_length, char pad = ' ') {
@@ -86,14 +86,14 @@ template <typename T> bool has_changed(T reg, SymBitVector &sym) {
   ss << (*reg);
   if (sym.type() == SymBitVector::Type::VAR) {
     const SymBitVectorVar *const var =
-        static_cast<const SymBitVectorVar *const>(sym.ptr);
+      static_cast<const SymBitVectorVar *const>(sym.ptr);
     if (var->get_name() == ss.str())
       return false;
   }
 
   if (sym.type() == SymBitVector::Type::ITE) {
     const SymBitVectorIte *const ite =
-        static_cast<const SymBitVectorIte *const>(sym.ptr);
+      static_cast<const SymBitVectorIte *const>(sym.ptr);
     const SymBoolAbstract *const cond = ite->cond_;
     auto var = dynamic_cast<const SymBoolVar *const>(cond);
     if (NULL != var && is_one(ite->a_) && is_zero(ite->b_)) {
@@ -240,9 +240,9 @@ void memory_info(Instruction &instr, SymState &state, TrivialMemory *mem) {
   auto reads = mem->get_reads();
   auto writes = mem->get_writes();
   bool assertCheck =
-      ((must_mem_write && writes.size()) ||
-       (!must_mem_write && !writes.size())) &&
-      ((must_mem_read && reads.size()) || (!must_mem_read && !reads.size()));
+    ((must_mem_write && writes.size()) ||
+     (!must_mem_write && !writes.size())) &&
+    ((must_mem_read && reads.size()) || (!must_mem_read && !reads.size()));
   assert(assertCheck && "Mem assert check failed!!");
 
   bool printed = false;

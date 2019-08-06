@@ -23,43 +23,81 @@
 
 namespace stoke {
 
+class KeyCache {
+private:
+  std::map<std::string, std::string> Store;
+  typedef std::pair<std::string, bool> P;
+public:
+  std::string getHash() {
+    std::string str("");
+    char alphabet[] =
+      "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    for (int i = 0; i < 6; i++) {
+      auto r = rand() % 62;
+      // cout << r << " "  ;
+      str += alphabet[r];
+    }
+
+    return str;
+  }
+
+  P getKey(std::string str, size_t idx) {
+    std::string key = str + std::to_string(idx);
+    if (Store.count(key))
+      return P(Store.at(key), true);
+
+    auto hash = getHash();
+    while (Store.count(hash)) {
+      hash = getHash();
+    }
+    hash += std::to_string(idx);
+    hash = "I" + hash;
+
+    Store[key] = hash;
+    return P(hash, false);
+  }
+};
+
 class DotWriter {
 public:
-  /** Creates a new dot writer. By default, all extended printing is disabled. */
+  /** Creates a new dot writer. By default, all extended printing is disabled.
+   */
   DotWriter() {
     set_def_in(false, false);
     set_live_out(false);
     set_reaching_defs_in(false);
   }
 
-  /** Toggle whether to display the defined-in relation for blocks and instructions. */
-  DotWriter& set_def_in(bool block, bool instr) {
+  /** Toggle whether to display the defined-in relation for blocks and
+   * instructions. */
+  DotWriter &set_def_in(bool block, bool instr) {
     def_in_block_ = block;
     def_in_instr_ = instr;
     return *this;
   }
   /** Toggle whether to display the live-out relation for blocks. */
-  DotWriter& set_live_out(bool block) {
+  DotWriter &set_live_out(bool block) {
     live_out_block_ = block;
     return *this;
   }
 
-  /** Toggle whether to display the reaching-defs-in relation for instructions. */
-  DotWriter& set_reaching_defs_in(bool flag) {
+  /** Toggle whether to display the reaching-defs-in relation for instructions.
+   */
+  DotWriter &set_reaching_defs_in(bool flag) {
     reaching_defs_in_instr_ = flag;
     return *this;
   }
 
-  /** Toggle whether to display the reaching-defs-in relation for instructions. */
-  DotWriter& set_dfg(bool flag) {
+  /** Toggle whether to display the reaching-defs-in relation for instructions.
+   */
+  DotWriter &set_dfg(bool flag) {
     dfg_ = flag;
     return *this;
   }
 
-
-
   /** Emits a control flow graph in .dot format. */
-  void operator()(std::ostream& os, const Cfg& cfg) const {
+  void operator()(std::ostream &os, const Cfg &cfg) const {
     os << "digraph g {" << std::endl;
     os << "colorscheme = blues6" << std::endl;
 
@@ -70,26 +108,27 @@ public:
       write_exit(os, cfg);
       write_blocks(os, cfg);
       write_edges(os, cfg);
-
     }
     os << "}";
   }
 
 private:
   /** Write the entry block for this graph. */
-  void write_entry(std::ostream& os, const Cfg& cfg) const;
+  void write_entry(std::ostream &os, const Cfg &cfg) const;
   /** Write the exit block for this graph. */
-  void write_exit(std::ostream& os, const Cfg& cfg) const;
+  void write_exit(std::ostream &os, const Cfg &cfg) const;
   /** Write a block. */
-  void write_block(std::ostream& os, const Cfg& cfg, Cfg::id_type id) const;
+  void write_block(std::ostream &os, const Cfg &cfg, Cfg::id_type id) const;
   /** Write the basic blocks in this graph. */
-  void write_blocks(std::ostream& os, const Cfg& cfg) const;
+  void write_blocks(std::ostream &os, const Cfg &cfg) const;
   /** Write the edges in this graph. */
-  void write_edges(std::ostream& os, const Cfg& cfg) const;
+  void write_edges(std::ostream &os, const Cfg &cfg) const;
   /** Write the contents of a register set. */
-  void write_reg_set(std::ostream& os, const x64asm::RegSet& rs) const;
-  void write_reaching_def(std::ostream& os, const Dfv_RD& rs) const;
-  void plot_dfg(std::ostream& os, const Cfg& cfg) const;
+  void write_reg_set(std::ostream &os, const x64asm::RegSet &rs) const;
+  void write_reaching_def(std::ostream &os, const Dfv_RD &rs) const;
+  void plot_dfg(std::ostream &os, const Cfg &cfg) const;
+  void plot_dfg_node(std::ostream &os, const Cfg &cfg, KeyCache &cache) const;
+  void plot_dfg_edge(std::ostream &os, const Cfg &cfg, KeyCache &cache) const;
 
   /** Write the defined-in relation for blocks? */
   bool def_in_block_;

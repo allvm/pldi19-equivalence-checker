@@ -24,7 +24,7 @@ namespace stoke {
 
 /** A class to print symbolic formulas in a nicely readable way. */
 class SymSearchVisitor
-    : public SymVisitor<x64asm::RegSet, x64asm::RegSet, x64asm::RegSet> {
+  : public SymVisitor<x64asm::RegSet, x64asm::RegSet, x64asm::RegSet> {
 
   // the implementation loosely follows https://gist.github.com/kputnam/5625856
 
@@ -51,7 +51,7 @@ public:
       if (ss >> r64) {
         retval += r64;
       } else {
-        std::cout << "\nNon R64: " << bv->name_;
+        //std::cout << "\nNon R64: " << bv->name_;
       }
     }
     for (auto sse_it = ymms_all.sse_begin(); sse_it != ymms_all.sse_end();
@@ -61,7 +61,7 @@ public:
       if (ss >> ymm) {
         retval += ymm;
       } else {
-        std::cout << "\nNon Ymm: " << bv->name_;
+        //std::cout << "\nNon Ymm: " << bv->name_;
       }
     }
     return retval;
@@ -71,10 +71,10 @@ public:
   x64asm::RegSet visit(const SymBoolVar *const b) {
     x64asm::RegSet retval = x64asm::RegSet::empty();
     x64asm::RegSet flags_all =
-        x64asm::RegSet::empty() + x64asm::Constants::eflags_cf() +
-        x64asm::Constants::eflags_sf() + x64asm::Constants::eflags_zf() +
-        x64asm::Constants::eflags_of() + x64asm::Constants::eflags_pf() +
-        x64asm::Constants::eflags_af();
+      x64asm::RegSet::empty() + x64asm::Constants::eflags_cf() +
+      x64asm::Constants::eflags_sf() + x64asm::Constants::eflags_zf() +
+      x64asm::Constants::eflags_of() + x64asm::Constants::eflags_pf() +
+      x64asm::Constants::eflags_af();
 
     for (auto flag_it = flags_all.flags_begin();
          flag_it != flags_all.flags_end(); ++flag_it) {
