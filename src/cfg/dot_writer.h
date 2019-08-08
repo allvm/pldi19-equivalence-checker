@@ -20,6 +20,7 @@
 #include "src/ext/x64asm/include/x64asm.h"
 
 #include "src/cfg/cfg.h"
+#include "src/cfg/dfg.h"
 
 namespace stoke {
 
@@ -42,8 +43,10 @@ public:
     return str;
   }
 
-  P getKey(std::string str, size_t idx) {
-    std::string key = str + std::to_string(idx);
+  //P getKey(std::string str, size_t idx) {
+  P getKey(std::string str) {
+    //std::string key = str + std::to_string(idx);
+    std::string key = str;
     if (Store.count(key))
       return P(Store.at(key), true);
 
@@ -51,7 +54,7 @@ public:
     while (Store.count(hash)) {
       hash = getHash();
     }
-    hash += std::to_string(idx);
+    //hash += std::to_string(idx);
     hash = "I" + hash;
 
     Store[key] = hash;
@@ -102,13 +105,21 @@ public:
     os << "colorscheme = blues6" << std::endl;
 
     if (dfg_) {
-      plot_dfg(os, cfg);
+      //plot_dfg(os, cfg);
     } else {
       write_entry(os, cfg);
       write_exit(os, cfg);
       write_blocks(os, cfg);
       write_edges(os, cfg);
     }
+    os << "}";
+  }
+
+  /** Emits a control flow graph in .dot format. */
+  void operator()(std::ostream &os, const Dfg &dfg) const {
+    os << "digraph g {" << std::endl;
+    os << "colorscheme = blues6" << std::endl;
+    write_dfg(os, dfg);
     os << "}";
   }
 
@@ -126,9 +137,11 @@ private:
   /** Write the contents of a register set. */
   void write_reg_set(std::ostream &os, const x64asm::RegSet &rs) const;
   void write_reaching_def(std::ostream &os, const Dfv_RD &rs) const;
-  void plot_dfg(std::ostream &os, const Cfg &cfg) const;
-  void plot_dfg_node(std::ostream &os, const Cfg &cfg, KeyCache &cache) const;
-  void plot_dfg_edge(std::ostream &os, const Cfg &cfg, KeyCache &cache) const;
+  //void plot_dfg(std::ostream &os, const Cfg &cfg) const;
+  //void plot_dfg_node(std::ostream &os, const Cfg &cfg, KeyCache &cache) const;
+  //void plot_dfg_edge(std::ostream &os, const Cfg &cfg, KeyCache &cache) const;
+  void write_dfg(std::ostream &os, const Dfg &dfg) const;
+  void write_dfg_node(std::ostream &os, const Dfg &cfg, KeyCache &cache) const;
 
   /** Write the defined-in relation for blocks? */
   bool def_in_block_;

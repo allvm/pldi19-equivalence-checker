@@ -121,6 +121,7 @@ endif
 
 SRC_OBJ=\
 	src/cfg/cfg.o \
+	src/cfg/dfg.o \
 	src/cfg/cfg_transforms.o \
 	src/cfg/dominators.o \
 	src/cfg/dot_writer.o \
@@ -259,6 +260,7 @@ BIN=\
 	bin/stoke_testcase \
 	bin/stoke_tcgen \
 	bin/stoke_debug_cfg \
+	bin/stoke_debug_dfg \
 	bin/stoke_debug_instruction_rwset \
 	bin/stoke_debug_invariant \
 	bin/stoke_debug_sandbox \

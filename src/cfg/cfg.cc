@@ -23,7 +23,7 @@ using namespace x64asm;
 //#define STOKE_CFG_ALL_INSTR_BLOCK
 //#define STOKE_CFG_AFTER_LABEL_NEW_BLOACK
 //#define STOKE_CFG_COMPARE_NEW_BLOCK
-#define DEBUG_CFG_RD
+//#define DEBUG_CFG_RD
 
 namespace stoke {
 
@@ -228,7 +228,6 @@ void Cfg::recompute_preds_instrs() {
     p.clear();
 
   for (auto i = get_entry(), ie = get_exit(); i < ie; ++i) {
-    cout << "Block: " << i << ", #instr: " << num_instrs(i) << "\n";
     for (size_t j = 0, je = num_instrs(i); j < je; ++j) {
       if (j == 0) {
         for (auto p = pred_begin(i), pe = pred_end(i); p != pe; ++p) {
@@ -309,7 +308,7 @@ void Cfg::recompute_reaching_defs_in_gen_kill() {
       for (size_t k = 0 ; k < get_code().size() + 1; k++) {
         if (k == idx + 1) continue;
 
-        if(k == 0) {
+        if (k == 0) {
           reaching_defs_in_kill_[idx][k] = kill;
         } else {
           gen = reaching_defs_in_gen_[k-1][k];
