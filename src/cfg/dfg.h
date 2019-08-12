@@ -36,33 +36,44 @@ using namespace x64asm;
 
 namespace stoke {
 class Dfg;
+
 class DataValue {
+public:
+  enum DataValueType {
+    UINIT = 0, // Uninitialized
+    REG = 1,   // Reg
+    EFLAG = 2, // Flag
+    EXPLICIT_MEM = 3,   // Memory
+    IMPLICIT_MEM = 4,   // Memory
+    TOTAL = 5,
+  };
 private:
-  // x64asm::Operand* RegOrMem;
-  // x64asm::Eflags* Flag;
   RegSet RegOrMemOrFlag;
-  // Eflags Flag;
-  // 0 --> Uninitialized:
-  // 1 --> Reg;
-  // 2 --> Eflag;
-  // 3 --> Memory
   int type;
   size_t instr_idx;
+  Mem mem;
 
 public:
-  DataValue(size_t idx) : instr_idx(idx) {
-    type = 0;
+
+  DataValue(size_t idx, Mem mem_ = M8(Constants::rax())) : instr_idx(idx), mem(mem_) {
+    type = UINIT;
     RegOrMemOrFlag = RegSet::empty();
   }
   bool isRegOrMem() const;
+  bool isReg() const;
   bool isFlag() const;
-  Operand getReg() const;
-  Eflags getFlag() const;
+  bool isMemory() const;
+  //Operand getReg() const;
+  //Eflags getFlag() const;
   size_t getInstrIndex() const;
   RegSet getRegOrMemOrFlag() const;
   void addFlag(const Eflags &rhs);
   bool kills(DataValue *target);
-  void addReg(Operand rhs);
+  void addRegOrMem(Operand rhs);
+  void setType(size_t t) {
+    assert(t > 0 && t < TOTAL && "Type not a MEM or FLAG or REG!!");
+    type = t;
+  }
   stringstream &print(stringstream &os, const Dfg *dfg) const;
 };
 
@@ -164,10 +175,7 @@ public:
   }
 
   stringstream &printDFG(stringstream &os) const {
-    for (size_t k = 0; k < code_size; k++) {
-      printDataFlowValue(os, k);
-    }
-
+    os << "Printing info of each dfg node...\n";
     for (size_t k = 0; k < num_nodes; k++) {
       os << "#" << k << ": ";
       printNode(os, k);
@@ -178,6 +186,12 @@ public:
       os << "\n";
 
     }
+
+    os << "Printing data flow values at each program point...\n";
+    for (size_t k = 0; k < code_size; k++) {
+      printDataFlowValue(os, k);
+    }
+
     return os;
   }
 

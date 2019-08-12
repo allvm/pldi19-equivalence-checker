@@ -33,15 +33,6 @@ using namespace std;
 using namespace stoke;
 
 auto& content = Heading::create("Content Options:");
-auto& dib = FlagArg::create("dib")
-            .alternate("def_in_block")
-            .description("Display def in values for basic blocks");
-auto& dii = FlagArg::create("dii")
-            .alternate("def_in_instr")
-            .description("Display def in values for instructions");
-auto& lob = FlagArg::create("lob")
-            .alternate("live_out_block")
-            .description("Display live out values for basic blocks");
 auto& rd = FlagArg::create("rd")
            .alternate("reaching_defs_in")
            .description("Display reaching defintions in values for instructions");
@@ -50,6 +41,11 @@ auto& dfg = FlagArg::create("dfg")
             .description("Display data flow graph");
 
 auto& io = Heading::create("I/O Options:");
+auto& dot_out = ValueArg<string>::create("do")
+                .alternate("dot-out")
+                .usage("<path/to/file.dot>")
+                .description("Path to write dfg to")
+                .default_val("");
 auto& out = ValueArg<string>::create("o")
             .alternate("out")
             .usage("<path/to/file.pdf>")
@@ -87,11 +83,7 @@ void to_dot(const string& dot_file) {
   target = new Dfg(cfg);
 
   DotWriter dw;
-  dw.set_def_in(dib, dii)
-  .set_live_out(lob)
-  .set_reaching_defs_in(rd)
-  .set_dfg(dfg);
-
+  dw.set_dfg(dfg);
   dw(ofs, *target);
 }
 
@@ -112,7 +104,9 @@ int main(int argc, char** argv) {
   DebugHandler::install_sigsegv();
   DebugHandler::install_sigill();
 
-  const auto dot_file = tempfile("/tmp/stoke_debug_cfg.dot.XXXXXX");
+  auto dot_file = dot_out.value();
+  if (dot_out.value() == "")
+    dot_file = tempfile("/tmp/stoke_debug_cfg.dot.XXXXXX");
 
   to_dot(dot_file);
   if (!to_pdf(dot_file, out.value())) {
