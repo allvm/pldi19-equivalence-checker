@@ -168,6 +168,7 @@ static string plot_node(ostream &os, const Cfg &cfg, KeyCache &cache, std::strin
 
 void DotWriter::write_dfg(ostream &os, const Dfg &dfg) const {
   KeyCache cache;
+  assert(dfg.num_nodes == dfg.per_dfg_node_reaching_defs_in_.size() && "Check!");
   for (size_t i = 0 ; i < dfg.num_nodes ; i++) {
     std::stringstream ss_dest;
     dfg.printNode(ss_dest, i);

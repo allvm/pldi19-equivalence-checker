@@ -39,6 +39,8 @@ auto& rd = FlagArg::create("rd")
 auto& dfg = FlagArg::create("dfg")
             .alternate("data_flow_graph")
             .description("Display data flow graph");
+auto& no_fresh_memory = FlagArg::create("no-fresh-memory")
+                        .alternate("no-fresh-mem");
 
 auto& io = Heading::create("I/O Options:");
 auto& dot_out = ValueArg<string>::create("do")
@@ -80,7 +82,7 @@ void to_dot(const string& dot_file) {
     cfg = new Cfg(target_arg.value().get_code());
   }
 
-  target = new Dfg(cfg);
+  target = new Dfg(cfg, !no_fresh_memory);
 
   DotWriter dw;
   dw.set_dfg(dfg);

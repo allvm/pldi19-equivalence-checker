@@ -43,14 +43,14 @@ bool DataValue::isFlag() const {
   return type == EFLAG;
 }
 
-//Operand DataValue::getReg() const {
+// Operand DataValue::getReg() const {
 //  assert((type == REG || type == MEM) && "Reg or Mem Absent!");
 //  if (RegOrMemOrFlag.gp_begin() != RegOrMemOrFlag.gp_end())
 //    return *RegOrMemOrFlag.gp_begin();
 //  // if(RegOrMemOrFlag.sse_begin() != RegOrMemOrFlag.sse_begin())
 //  return *RegOrMemOrFlag.sse_begin();
 //}
-//Eflags DataValue::getFlag() const {
+// Eflags DataValue::getFlag() const {
 //  assert(type == 2 && "Flag Absent!");
 //  return *RegOrMemOrFlag.flags_begin();
 //}
@@ -144,38 +144,38 @@ void DataValue::addRegOrMem(Operand rhs) {
     Type t = rhs.type();
     switch (t) {
     case Type::M_8: {
-      M<M8> *r = static_cast<M<M8>*>(&rhs);
-      //RegOrMemOrFlag += *r;
+      M<M8> *r = static_cast<M<M8> *>(&rhs);
+      // RegOrMemOrFlag += *r;
       mem = *r;
       break;
     }
     case Type::M_16: {
-      M<M16> *r = static_cast<M<M16>*>(&rhs);
-      //RegOrMemOrFlag += *r;
+      M<M16> *r = static_cast<M<M16> *>(&rhs);
+      // RegOrMemOrFlag += *r;
       mem = *r;
       break;
     }
     case Type::M_32: {
-      M<M32> *r = static_cast<M<M32>*>(&rhs);
-      //RegOrMemOrFlag += *r;
+      M<M32> *r = static_cast<M<M32> *>(&rhs);
+      // RegOrMemOrFlag += *r;
       mem = *r;
       break;
     }
     case Type::M_64: {
-      M<M64> *r = static_cast<M<M64>*>(&rhs);
-      //RegOrMemOrFlag += *r;
+      M<M64> *r = static_cast<M<M64> *>(&rhs);
+      // RegOrMemOrFlag += *r;
       mem = *r;
       break;
     }
     case Type::M_128: {
-      M<M128> *r = static_cast<M<M128>*>(&rhs);
-      //RegOrMemOrFlag += *r;
+      M<M128> *r = static_cast<M<M128> *>(&rhs);
+      // RegOrMemOrFlag += *r;
       mem = *r;
       break;
     }
     case Type::M_256: {
-      M<M256> *r = static_cast<M<M256>*>(&rhs);
-      //RegOrMemOrFlag += *r;
+      M<M256> *r = static_cast<M<M256> *>(&rhs);
+      // RegOrMemOrFlag += *r;
       mem = *r;
       break;
     }
@@ -342,7 +342,12 @@ stringstream &DataFlowValue::print(stringstream &os, const Dfg *dfg) const {
 /*
 ** Class Dfg
 */
-void Dfg::recompute_nodes() {
+void Dfg::collect_nodes() {
+
+#ifdef DEBUG_CFG_RD
+  stringstream ss;
+  ss << "Collecting nodes...\n";
+#endif
 
   // Add entry node
   size_t idx = -1;
@@ -355,6 +360,12 @@ void Dfg::recompute_nodes() {
     DataValue *dfv = new DataValue(idx);
     dfv->addRegOrMem((*gp_it));
 
+#ifdef DEBUG_CFG_RD
+    ss << "#" << num_nodes << ": ";
+    dfv->print(ss, this);
+    ss << "\n";
+#endif
+
     setValueAtIndex(num_nodes, dfv);
     num_nodes++;
   }
@@ -364,6 +375,12 @@ void Dfg::recompute_nodes() {
        ++sse_it) {
     DataValue *dfv = new DataValue(idx);
     dfv->addRegOrMem((*sse_it));
+
+#ifdef DEBUG_CFG_RD
+    ss << "#" << num_nodes << ": ";
+    dfv->print(ss, this);
+    ss << "\n";
+#endif
 
     setValueAtIndex(num_nodes, dfv);
     num_nodes++;
@@ -375,6 +392,12 @@ void Dfg::recompute_nodes() {
     DataValue *dfv = new DataValue(idx);
     dfv->addFlag((*flag_it));
 
+#ifdef DEBUG_CFG_RD
+    ss << "#" << num_nodes << ": ";
+    dfv->print(ss, this);
+    ss << "\n";
+#endif
+
     setValueAtIndex(num_nodes, dfv);
     num_nodes++;
   }
@@ -382,6 +405,12 @@ void Dfg::recompute_nodes() {
   // Add node for enry memory
   DataValue *dfv = new DataValue(idx);
   dfv->setType(DataValue::IMPLICIT_MEM);
+
+#ifdef DEBUG_CFG_RD
+  ss << "#" << num_nodes << ": ";
+  dfv->print(ss, this);
+  ss << "\n\n";
+#endif
 
   setValueAtIndex(num_nodes, dfv);
   num_nodes++;
@@ -397,12 +426,19 @@ void Dfg::recompute_nodes() {
       const auto instr = getCfg().get_code()[idx];
       auto must_write = instr.must_write_set();
       auto must_mem_write = instr.must_write_memory();
+      auto must_mem_read = instr.must_read_memory();
 
       // Add node for a dest gp node
       for (auto gp_it = must_write.gp_begin(); gp_it != must_write.gp_end();
            ++gp_it) {
         DataValue *dfv = new DataValue(idx);
         dfv->addRegOrMem((*gp_it));
+
+#ifdef DEBUG_CFG_RD
+        ss << "#" << num_nodes << ": ";
+        dfv->print(ss, this);
+        ss << "\n";
+#endif
 
         setValueAtIndex(num_nodes, dfv);
         num_nodes++;
@@ -414,6 +450,12 @@ void Dfg::recompute_nodes() {
         DataValue *dfv = new DataValue(idx);
         dfv->addRegOrMem((*sse_it));
 
+#ifdef DEBUG_CFG_RD
+        ss << "#" << num_nodes << ": ";
+        dfv->print(ss, this);
+        ss << "\n";
+#endif
+
         setValueAtIndex(num_nodes, dfv);
         num_nodes++;
       }
@@ -424,43 +466,75 @@ void Dfg::recompute_nodes() {
         DataValue *dfv = new DataValue(idx);
         dfv->addFlag((*flag_it));
 
+#ifdef DEBUG_CFG_RD
+        ss << "#" << num_nodes << ": ";
+        dfv->print(ss, this);
+        ss << "\n";
+#endif
+
         setValueAtIndex(num_nodes, dfv);
         num_nodes++;
       }
 
-      // Add edge to memory nodes
-      if (!must_mem_write) continue;
-      DataValue *dfv = new DataValue(idx);
+      // Add edge to memory write nodes
+      if (must_mem_write) {
+        DataValue *dfv = new DataValue(idx);
 
-      if (-1 != instr.mem_index()) {
-        auto mem_op = instr.get_operand<M8>(instr.mem_index());
-        dfv->addRegOrMem(mem_op);
-        //cout << "DSAND" << instr << "\n" << mem_op << "\n" << dfv->getRegOrMemOrFlag() << "\n";
-      } else {
-        dfv->setType(DataValue::IMPLICIT_MEM);
+        if (-1 != instr.mem_index()) {
+          auto mem_op = instr.get_operand<M8>(instr.mem_index());
+          dfv->addRegOrMem(mem_op);
+        } else {
+          dfv->setType(DataValue::IMPLICIT_MEM);
+        }
+
+#ifdef DEBUG_CFG_RD
+        ss << "#" << num_nodes << ": ";
+        dfv->print(ss, this);
+        ss << "\n";
+        if (!fresh_memory || !must_mem_read) {
+          ss << "\n";
+        }
+#endif
+
+        setValueAtIndex(num_nodes, dfv);
+        num_nodes++;
       }
 
-      setValueAtIndex(num_nodes, dfv);
-      num_nodes++;
+      // Add edge to memory write nodes
+      if (fresh_memory && must_mem_read) {
+        DataValue *dfv = new DataValue(idx);
+
+        if (-1 != instr.mem_index()) {
+          auto mem_op = instr.get_operand<M8>(instr.mem_index());
+          dfv->addRegOrMem(mem_op);
+        } else {
+          dfv->setType(DataValue::IMPLICIT_MEM);
+        }
+
+#ifdef DEBUG_CFG_RD
+        ss << "#" << num_nodes << ": ";
+        dfv->print(ss, this);
+        ss << "\n\n";
+#endif
+
+        setValueAtIndex(num_nodes, dfv);
+        num_nodes++;
+      }
     }
   }
+
+#ifdef DEBUG_CFG_RD
+  cout << ss.str();
+#endif
+
 }
 
-/*
-  The data flow information for each instruction is a vector of size
-  get_code().size() + 1.
-  Each element of that vector hols a set of registers.
-
-  The gen set of an instruction i is per_instr_reaching_defs_in_gen_i][i]
-
-  The kill set of an instruction i is per_instr_reaching_defs_in_gen_i][j],
-  where j is all
-  the istructions which are killed
-  and the content of per_instr_reaching_defs_in_gen_i][j] is the regs if j which
-  are
-  killed by i
-*/
 void Dfg::recompute_reaching_defs_in_gen_kill() {
+
+#ifdef DEBUG_CFG_RD
+  stringstream ss;
+  ss << "Determining Gens...\n";
+#endif
 
   per_instr_reaching_defs_in_gen_.resize(code_size,
                                          DataFlowValue(num_nodes, 0));
@@ -472,11 +546,22 @@ void Dfg::recompute_reaching_defs_in_gen_kill() {
        ++i) {
     for (size_t j = 0, je = cfg->num_instrs(*i); j < je; ++j) {
       const auto idx = cfg->get_index({*i, j});
+#ifdef DEBUG_CFG_RD
+      ss << "Instruction index #" << idx << ": " << cfg->get_code()[idx] << "\n\tGens:\n";
+#endif
       vector<size_t> instr_data_outs = Instr2Indices[idx];
       for (auto instr_data_out : instr_data_outs) {
+#ifdef DEBUG_CFG_RD
+        ss << "\t\t";
+        ValueAtIndex(instr_data_out)->print(ss, this);
+        ss << "\n\n";
+#endif
         per_instr_reaching_defs_in_gen_[idx][instr_data_out] = 1;
       }
     }
+#ifdef DEBUG_CFG_RD
+    ss << "\n";
+#endif
   }
 
   // Find the kill set for all instructions w.r.t data flow values.
@@ -484,22 +569,43 @@ void Dfg::recompute_reaching_defs_in_gen_kill() {
        ++i) {
     for (size_t j = 0, je = cfg->num_instrs(*i); j < je; ++j) {
       const auto idx = cfg->get_index({*i, j});
+#ifdef DEBUG_CFG_RD
+      ss << "Instruction index #" << idx << ": " << cfg->get_code()[idx] << "\n\tKills:\n";
+#endif
       // Find all the out defs for instr idx
       vector<size_t> instr_data_outs = Instr2Indices[idx];
       for (auto instr_data_out : instr_data_outs) {
         // For each such out defs, find the defined out set
         auto local_kill_set = ValueAtIndex(instr_data_out);
+#ifdef DEBUG_CFG_RD
+        ss << "\n\t\tOut member: ";
+        local_kill_set->print(ss, this);
+        ss << " kills: \n";
+#endif
 
         // find all the data flow indices `local_kill_set` can kill
         for (size_t k = 0; k < num_nodes; k++) {
           auto kill_set = ValueAtIndex(k);
           if (local_kill_set->kills(kill_set)) {
+#ifdef DEBUG_CFG_RD
+            ss << "\t\t\t";
+            ValueAtIndex(k)->print(ss, this);
+            ss << "\n";
+#endif
             per_instr_reaching_defs_in_kill_[idx][k] = 1;
           }
         }
       }
+#ifdef DEBUG_CFG_RD
+      ss << "\n";
+#endif
     }
   }
+
+#ifdef DEBUG_CFG_RD
+  cout << ss.str();
+#endif
+
 }
 
 void Dfg::recompute_reaching_defs_in() {
@@ -509,7 +615,7 @@ void Dfg::recompute_reaching_defs_in() {
   per_instr_reaching_defs_out_.resize(code_size, DataFlowValue(num_nodes));
 
   fxn_reaching_defs_ins_ = DataFlowValue(num_nodes, 0, num_entry_nodes);
-  //for (size_t i = 0; i < code_size; i++) {
+  // for (size_t i = 0; i < code_size; i++) {
   //  per_instr_reaching_defs_out_[i] = fxn_reaching_defs_ins_;
   //}
 
@@ -535,13 +641,14 @@ void Dfg::recompute_reaching_defs_in() {
             }
           }
         } else {
-          per_instr_reaching_defs_in_[idx] |= per_instr_reaching_defs_out_[idx - 1];
+          per_instr_reaching_defs_in_[idx] |=
+            per_instr_reaching_defs_out_[idx - 1];
         }
 
         // Transfer function
-        const auto new_out =
-          (per_instr_reaching_defs_in_[idx] - per_instr_reaching_defs_in_kill_[idx]) |
-          per_instr_reaching_defs_in_gen_[idx];
+        const auto new_out = (per_instr_reaching_defs_in_[idx] -
+                              per_instr_reaching_defs_in_kill_[idx]) |
+                             per_instr_reaching_defs_in_gen_[idx];
 
         // Check for fixed point
         changed |= per_instr_reaching_defs_out_[idx] != new_out;
@@ -559,6 +666,8 @@ void Dfg::recompute_reaching_defs_in() {
       const auto idx = cfg->get_index({*i, j});
       auto instr = cfg->get_code()[idx];
       auto rd_ins = per_instr_reaching_defs_in_[idx];
+      if (fresh_memory)
+        rd_ins = per_instr_reaching_defs_out_[idx];
       auto read_set = cfg->maybe_read_set(instr);
       bool is_memory_read = instr.must_read_memory();
 
@@ -571,7 +680,7 @@ void Dfg::recompute_reaching_defs_in() {
           // & if the current instr has a reg read set,
           // & the reaching def is in the read set.
           // This applies when the curr instr is memory
-          if ((read_set & dfv->getRegOrMemOrFlag()) != RegSet::empty()) {
+          if (( read_set & dfv->getRegOrMemOrFlag()) != RegSet::empty()) {
             per_instr_reaching_and_used_defs_in_[idx][k] = 1;
           }
         } else if (dfv->isMemory()) {
@@ -592,8 +701,7 @@ void Dfg::recompute_reaching_defs_in() {
   }
 
   // Find the per dfg node reaching defintions
-  per_dfg_node_reaching_defs_in_.resize(num_nodes,
-                                        DataFlowValue(num_nodes));
+  per_dfg_node_reaching_defs_in_.resize(num_nodes, DataFlowValue(num_nodes));
   for (auto i = ++cfg->reachable_begin(), ie = cfg->reachable_end(); i != ie;
        ++i) {
     for (size_t j = 0, je = cfg->num_instrs(*i); j < je; ++j) {
@@ -609,8 +717,6 @@ void Dfg::recompute_reaching_defs_in() {
       }
     }
   }
-
-
 
 #ifdef DEBUG_CFG_RD
   stringstream ss;

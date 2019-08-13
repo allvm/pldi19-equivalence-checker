@@ -40,13 +40,14 @@ class Dfg;
 class DataValue {
 public:
   enum DataValueType {
-    UINIT = 0, // Uninitialized
-    REG = 1,   // Reg
-    EFLAG = 2, // Flag
-    EXPLICIT_MEM = 3,   // Memory
-    IMPLICIT_MEM = 4,   // Memory
+    UINIT = 0,        // Uninitialized
+    REG = 1,          // Reg
+    EFLAG = 2,        // Flag
+    EXPLICIT_MEM = 3, // Memory
+    IMPLICIT_MEM = 4, // Memory
     TOTAL = 5,
   };
+
 private:
   RegSet RegOrMemOrFlag;
   int type;
@@ -54,8 +55,8 @@ private:
   Mem mem;
 
 public:
-
-  DataValue(size_t idx, Mem mem_ = M8(Constants::rax())) : instr_idx(idx), mem(mem_) {
+  DataValue(size_t idx, Mem mem_ = M8(Constants::rax()))
+    : instr_idx(idx), mem(mem_) {
     type = UINIT;
     RegOrMemOrFlag = RegSet::empty();
   }
@@ -63,8 +64,8 @@ public:
   bool isReg() const;
   bool isFlag() const;
   bool isMemory() const;
-  //Operand getReg() const;
-  //Eflags getFlag() const;
+  // Operand getReg() const;
+  // Eflags getFlag() const;
   size_t getInstrIndex() const;
   RegSet getRegOrMemOrFlag() const;
   void addFlag(const Eflags &rhs);
@@ -131,6 +132,8 @@ public:
   /** Edges */
   map<id_type, vector<id_type>> in_edges;
 
+  bool fresh_memory;
+
 private:
   const Cfg *cfg;
   std::map<DataValue *, size_t> Value2Index;
@@ -138,8 +141,9 @@ private:
   std::map<size_t, vector<size_t>> Instr2Indices;
 
 public:
-  explicit Dfg(const Cfg *c) : cfg(c), fxn_reaching_defs_ins_(0) {
+  explicit Dfg(const Cfg *c, bool fresh_mem = true) : cfg(c), fxn_reaching_defs_ins_(0) {
     assert(cfg && "NULL CFG!!");
+    fresh_memory = fresh_mem;
     num_nodes = 0;
     code_size = cfg->get_code().size();
     recompute();
@@ -175,21 +179,20 @@ public:
   }
 
   stringstream &printDFG(stringstream &os) const {
+    os << "Printing data flow values at each program point...\n";
+    for (size_t k = 0; k < code_size; k++) {
+      printDataFlowValue(os, k);
+    }
+
     os << "Printing info of each dfg node...\n";
     for (size_t k = 0; k < num_nodes; k++) {
       os << "#" << k << ": ";
       printNode(os, k);
       os << "\n";
 
-      os << "Def-Ins: \n";
+      os << "Per dfg node Def-Ins: \n";
       per_dfg_node_reaching_defs_in_[k].print(os, this);
       os << "\n";
-
-    }
-
-    os << "Printing data flow values at each program point...\n";
-    for (size_t k = 0; k < code_size; k++) {
-      printDataFlowValue(os, k);
     }
 
     return os;
@@ -202,7 +205,7 @@ public:
 
     auto gen_set = per_instr_reaching_defs_in_gen_[idx];
     auto kill_set = per_instr_reaching_defs_in_kill_[idx];
-    auto rd_in_set = per_instr_reaching_defs_in_[idx];
+    auto rd_in_set = per_instr_reaching_defs_out_[idx];
     auto rd_used_in_set = per_instr_reaching_and_used_defs_in_[idx];
 
     os << "Gen-Set: \n";
@@ -229,7 +232,7 @@ public:
   /** The kill set for each instruction. */
   vector<DataFlowValue> per_instr_reaching_defs_in_kill_;
   ///** Recompute the indices in blocks_. */
-  void recompute_nodes();
+  void collect_nodes();
   ///** Recomputes the gen and kill sets used by recompute_reaching_defs(). */
   void recompute_reaching_defs_in_gen_kill();
   DataFlowValue fxn_reaching_defs_ins_;
@@ -241,7 +244,7 @@ public:
   /** Recompute internal state; recomputes basic block structure and data flow
    * values. */
   void recompute() {
-    recompute_nodes();
+    collect_nodes();
     recompute_reaching_defs_in();
   }
   void recompute_reaching_defs_in();
